@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+README.md
+.env
+.vscode
+.idea
+*.md
+server/index.ts.bak
+server/index_test.ts
+node-v20.15.1-darwin-arm64/
+iphone-culture.db*
