@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { apiGet } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Smartphone, Copy, Check, Star, Search, X, CreditCard, Tag } from 'lucide-react';
+import { Smartphone, Copy, Check, Star, Search, X, CreditCard, Tag, Calculator } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Catalogo() {
+  const navigate = useNavigate();
   const [items, setItems] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [search, setSearch] = useState('');
@@ -46,11 +48,11 @@ export default function Catalogo() {
   const fmt = (n: number) => Math.round(n || 0).toLocaleString('es-AR');
 
   const generateCaption = (item: any) => {
-    return `📱 ${item.producto} ${item.modelo}\n💵 PRECIO CONTADO: USD $${fmt(item.precio_contado_usd)}\n💳 PRECIO REGULAR: USD $${fmt(item.precio_regular_usd)}\n\n📆 Cuotas sin interés:\n• 3 cuotas: ${item.cuotas_3}\n• 6 cuotas: ${item.cuotas_6}\n• 9 cuotas: ${item.cuotas_9}\n• 12 cuotas: ${item.cuotas_12}\n\n✅ ${item.descripcion || 'Garantía incluida'} | Envío gratis 🚚`;
+    return `📱 ${item.producto} ${item.modelo}\n💵 PRECIO CONTADO: USD $${fmt(item.precio_contado_usd)}\n💳 PRECIO REGULAR: USD $${fmt(item.precio_regular_usd)}\n\n✅ ${item.descripcion || 'Garantía incluida'} | Envío gratis 🚚`;
   };
 
   const generateWhatsApp = (item: any) => {
-    return `*${item.producto} ${item.modelo}*\n\n💵 *Contado:* USD $${fmt(item.precio_contado_usd)}\n💳 *Regular:* USD $${fmt(item.precio_regular_usd)}\n\n📆 *Cuotas sin interés:*\n• 3 cuotas de ${item.cuotas_3?.replace('$', '').replace(' x 3', '') || '-'}\n• 6 cuotas de ${item.cuotas_6?.replace('$', '').replace(' x 6', '') || '-'}\n• 9 cuotas de ${item.cuotas_9?.replace('$', '').replace(' x 9', '') || '-'}\n• 12 cuotas de ${item.cuotas_12?.replace('$', '').replace(' x 12', '') || '-'}\n\n✅ ${item.descripcion || 'Garantía incluida'}\n🚚 Envío gratis`;
+    return `*${item.producto} ${item.modelo}*\n\n💵 *Contado:* USD $${fmt(item.precio_contado_usd)}\n💳 *Regular:* USD $${fmt(item.precio_regular_usd)}\n\n✅ ${item.descripcion || 'Garantía incluida'}\n🚚 Envío gratis`;
   };
 
   const categoriaColor: Record<string, string> = {
@@ -135,25 +137,12 @@ export default function Catalogo() {
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-4">
-                  <p className="text-xs text-cyan-400/50 uppercase tracking-wider">Planes de cuotas</p>
-                  {[
-                    { key: 'cuotas_3', label: '3 cuotas' },
-                    { key: 'cuotas_6', label: '6 cuotas' },
-                    { key: 'cuotas_9', label: '9 cuotas' },
-                    { key: 'cuotas_12', label: '12 cuotas' },
-                  ].map(cuota => (
-                    <div key={cuota.key} className="flex items-center justify-between p-2 rounded-lg bg-black/20 border border-cyan-500/5 group/cuota hover:border-cyan-500/20 transition-colors">
-                      <span className="text-sm text-gray-300">{cuota.label}: <span className="text-cyan-300 font-medium">{item[cuota.key]}</span></span>
-                      <button
-                        onClick={() => copyText(`*${item.producto} ${item.modelo}*\n${cuota.label}: ${item[cuota.key]}\nContado: $${fmt(item.precio_contado_usd)}`, `${item.id}-${cuota.key}`)}
-                        className="p-1.5 rounded hover:bg-cyan-500/10 text-cyan-400/50 hover:text-cyan-400 transition-colors"
-                        title="Copiar para WhatsApp"
-                      >
-                        {copied === `${item.id}-${cuota.key}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  ))}
+                <div className="p-3 rounded-lg bg-black/30 border border-cyan-500/10 mb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calculator className="w-3.5 h-3.5 text-cyan-400" />
+                    <p className="text-[10px] text-cyan-400/70 uppercase tracking-wider">Cuotas</p>
+                  </div>
+                  <p className="text-sm text-gray-300">Usá el <span className="text-cyan-400 font-medium cursor-pointer hover:underline" onClick={() => navigate('/cuotero')}>Cuotero</span> para calcular cuotas reales con el dólar de hoy.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
