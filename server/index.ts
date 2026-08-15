@@ -568,6 +568,45 @@ app.get('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
 
 app.post('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
   const d = req.body;
+  const closerId = req.user.rol === 'admin' ? parseInt(d.closer_id || req.user.id) : req.user.id;
+  const result = await db.prepare(`
+    INSERT INTO turnos (
+      titulo, cliente_nombre, telefono, fecha_hora,
+      motivo, producto_objetivo, modelo_detalle, que_busca,
+      presupuesto_estimado, moneda, forma_pago, senia, monto_senia,
+      cliente_id, venta_id, closer_id,
+      confirmado, canal_contacto, ultimo_contacto, estado_recordatorio,
+      tipo, estado, notas, notificar_whatsapp
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    d.titulo || `${d.cliente_nombre || ''} - ${d.motivo || 'Consulta'}`,
+    d.cliente_nombre || '',
+    d.telefono || '',
+    d.fecha_hora,
+    d.motivo || 'Consulta',
+    d.producto_objetivo || 'Otro',
+    d.modelo_detalle || '',
+    d.que_busca || '',
+    parseFloat(d.presupuesto_estimado) || 0,
+    d.moneda || 'USD',
+    d.forma_pago || 'Efectivo',
+    d.senia || 'No aplica',
+    parseFloat(d.monto_senia) || 0,
+    d.cliente_id ? parseInt(d.cliente_id) : null,
+    d.venta_id ? parseInt(d.venta_id) : null,
+    closerId,
+    d.confirmado || 'Sin confirmar',
+    d.canal_contacto || 'WhatsApp',
+    d.ultimo_contacto || null,
+    d.estado_recordatorio || 'Pendiente',
+    d.tipo || 'Consulta',
+    d.estado || 'Pendiente',
+    d.notas || '',
+    d.notificar_whatsapp ? 1 : 0
+  );
+  res.json({ id: result.lastInsertRowid });
+}));
+  const d = req.body;
   const closerId = req.user.rol === 'admin' ? (d.closer_id || req.user.id) : req.user.id;
   const result = await db.prepare(`
     INSERT INTO turnos (
