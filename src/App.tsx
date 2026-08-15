@@ -34,19 +34,20 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
   const { user, loading } = useAuth();
   if (loading) return <div className="flex items-center justify-center h-screen bg-[#0a0a0f] text-cyan-400">Cargando...</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (requireAdmin && user.rol !== 'admin') return <Navigate to="/" replace />;
+  if (requireAdmin && user.rol !== 'admin' && user.rol !== 'oficina') return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
 function AppRoutes() {
   const { user } = useAuth();
+  const isAdminOrOficina = user?.rol === 'admin' || user?.rol === 'oficina';
 
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/factura/:id" element={<FacturaView />} />
       <Route element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
-        {/* Admin routes */}
+        {/* Admin routes (admin + oficina pueden ver) */}
         <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>} />
         <Route path="/admin/ventas" element={<ProtectedRoute requireAdmin><AdminVentas /></ProtectedRoute>} />
         <Route path="/admin/closers" element={<ProtectedRoute requireAdmin><AdminClosers /></ProtectedRoute>} />
@@ -54,7 +55,7 @@ function AppRoutes() {
         <Route path="/admin/noticias" element={<ProtectedRoute requireAdmin><AdminNoticias /></ProtectedRoute>} />
 
         {/* Closer routes */}
-        <Route path="/" element={user?.rol === 'admin' ? <Navigate to="/admin" /> : <CloserDashboard />} />
+        <Route path="/" element={isAdminOrOficina ? <Navigate to="/admin" /> : <CloserDashboard />} />
         <Route path="/ventas" element={<CloserVentas />} />
         <Route path="/metricas" element={<CloserMetricas />} />
         <Route path="/calendario" element={<CloserCalendario />} />

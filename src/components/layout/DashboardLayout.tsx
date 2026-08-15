@@ -16,19 +16,31 @@ const adminMenu = [
   { path: '/admin/noticias', label: 'Noticias', icon: Newspaper },
   { path: '/stock', label: 'Stock', icon: Package },
   { path: '/leads', label: 'Leads', icon: Target },
-  { path: '/catalogo', label: 'Catálogo', icon: BookOpen },
+  { path: '/catalogo', label: 'Catalogo', icon: BookOpen },
+  { path: '/cuotero', label: 'Cuotero', icon: Calculator },
+];
+
+const oficinaMenu = [
+  { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/admin/ventas', label: 'Todas las Ventas', icon: ShoppingCart },
+  { path: '/admin/closers', label: 'Vendedores', icon: Users },
+  { path: '/admin/mensajes', label: 'Mensajes', icon: MessageSquare },
+  { path: '/admin/noticias', label: 'Noticias', icon: Newspaper },
+  { path: '/stock', label: 'Stock', icon: Package },
+  { path: '/leads', label: 'Leads', icon: Target },
+  { path: '/catalogo', label: 'Catalogo', icon: BookOpen },
   { path: '/cuotero', label: 'Cuotero', icon: Calculator },
 ];
 
 const closerMenu = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/ventas', label: 'Mis Ventas', icon: ShoppingCart },
-  { path: '/metricas', label: 'Mis Métricas', icon: BarChart3 },
+  { path: '/metricas', label: 'Mis Metricas', icon: BarChart3 },
   { path: '/calendario', label: 'Calendario', icon: CalendarDays },
   { path: '/mensajes', label: 'Mensajes', icon: Mail },
   { path: '/stock', label: 'Stock', icon: Package },
   { path: '/leads', label: 'Leads', icon: Target },
-  { path: '/catalogo', label: 'Catálogo', icon: BookOpen },
+  { path: '/catalogo', label: 'Catalogo', icon: BookOpen },
   { path: '/cuotero', label: 'Cuotero', icon: Calculator },
   { path: '/facturas', label: 'Facturas', icon: FileText },
   { path: '/canjes', label: 'Canjes', icon: Repeat },
@@ -40,7 +52,11 @@ export default function DashboardLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isAdmin = user?.rol === 'admin';
-  const menuItems = isAdmin ? adminMenu : closerMenu;
+  const isOficina = user?.rol === 'oficina';
+  const menuItems = isAdmin ? adminMenu : isOficina ? oficinaMenu : closerMenu;
+
+  const rolLabel = isAdmin ? 'Admin' : isOficina ? 'Oficina' : 'Closer';
+  const rolColor = isAdmin ? 'amber' : isOficina ? 'violet' : 'cyan';
 
   return (
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
@@ -51,7 +67,7 @@ export default function DashboardLayout() {
           {!collapsed && (
             <div>
               <h1 className="text-lg font-bold tracking-tight text-cyan-400" style={{ textShadow: '0 0 10px rgba(0,240,255,0.5)' }}>iPhone Culture</h1>
-              <p className="text-[10px] text-cyan-400/60 uppercase tracking-widest">{isAdmin ? 'Admin' : 'Closer'} Dashboard</p>
+              <p className="text-[10px] text-cyan-400/60 uppercase tracking-widest">{rolLabel} Dashboard</p>
             </div>
           )}
         </div>
@@ -80,7 +96,11 @@ export default function DashboardLayout() {
             <div className="px-2 py-2 rounded-lg bg-cyan-500/5 border border-cyan-500/10">
               <p className="text-xs text-cyan-300 font-medium truncate">{user.nombre}</p>
               <p className="text-[10px] text-cyan-400/50 truncate">{user.email}</p>
-              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] border ${isAdmin ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'}`}>
+              <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] border ${
+                isAdmin ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                isOficina ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' :
+                'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+              }`}>
                 {user.rol}
               </span>
             </div>
