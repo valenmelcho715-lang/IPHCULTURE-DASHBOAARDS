@@ -6,24 +6,69 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, X, Bell, CalendarDays, Clock, Trash2, Pencil, MessageCircle, Phone } from 'lucide-react';
+import {
+  Plus, X, Bell, CalendarDays, Clock, Trash2, Pencil, MessageCircle, Phone,
+  AlertTriangle, CheckCircle, XCircle, RefreshCw, Filter, ChevronDown
+} from 'lucide-react';
+
+const MOTIVOS = ['Retiro', 'Plan Canje', 'Reparación', 'Consulta', 'Garantía', 'Seña', 'Compra'];
+const PRODUCTOS = ['iPhone', 'Samsung', 'Motorola', 'Xiaomi', 'MacBook', 'Accesorios', 'Reparación', 'Otro'];
+const MONEDAS = ['USD', 'ARS', 'USDT'];
+const FORMAS_PAGO = ['Cuotas', 'Tarjeta', 'Efectivo', 'Transferencia', 'Plan Canje', 'Mixto', 'Efectivo + Tarjeta'];
+const SENIAS = ['No aplica', 'Sin seña', 'Señó'];
+const CONFIRMADOS = ['Sin confirmar', 'Confirmado', 'No responde', 'Reprograma', 'Cancelado'];
+const CANALES = ['Instagram', 'WhatsApp', 'Llamada'];
+const RECORDATORIOS = ['Pendiente', 'Enviado', 'No aplica'];
+
+function accionSugerida(turno: any): { texto: string; color: string; icon: any } {
+  const ahora = new Date().getTime();
+  const fechaTurno = new Date(turno.fecha_hora).getTime();
+  const diffMin = Math.floor((fechaTurno - ahora) / 60000);
+  const confirmado = turno.confirmado || 'Sin confirmar';
+
+  if (confirmado === 'Cancelado') return { texto: '❌ Cancelado - Sin acción', color: 'gray', icon: XCircle };
+  if (confirmado === 'Confirmado') return { texto: '✅ Confirmado - Sin acción necesaria', color: 'green', icon: CheckCircle };
+  if (confirmado === 'No responde') return { texto: '🔔 URGENTE: Escribile ahora para confirmar', color: 'orange', icon: AlertTriangle };
+
+  if (diffMin <= 15 && diffMin >= 0) {
+    return { texto: '🚨 MANDAR MENSAJE YA: ¿Seguís en camino?', color: 'red', icon: AlertTriangle };
+  }
+  if (diffMin <= 120 && diffMin >= 0) {
+    return { texto: '🔔 URGENTE: Escribile ahora para confirmar asistencia', color: 'orange', icon: AlertTriangle };
+  }
+  if (diffMin < 0) {
+    return { texto: '⏰ Turno pasado', color: 'gray', icon: Clock };
+  }
+  return { texto: '⏳ Pendiente de confirmación', color: 'blue', icon: Clock };
+}
 
 export default function CloserCalendario() {
   const [turnos, setTurnos] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<any>({});
   const [alertas, setAlertas] = useState<any[]>([]);
   const [userTelefono, setUserTelefono] = useState('');
   const [editTelefono, setEditTelefono] = useState(false);
+  const [vista, setVista] = useState<'calendario' | 'hoy' | '48hs' | 'sinConfirmar' | 'todos'>('calendario');
+  const [clientes, setClientes] = useState<any[]>([]);
 
   useEffect(() => {
     loadTurnos();
     loadUserTelefono();
-    const interval = setInterval(checkAlertas, 60000); // revisar cada minuto
+    loadClientes();
+    const interval = setInterval(checkAlertas, 60000);
     checkAlertas();
     return () => clearInterval(interval);
   }, []);
+
+  const loadClientes = async () => {
+    try {
+      const data = await apiGet('/clientes');
+      setClientes(Array.isArray(data) ? data : []);
+    } catch { /* ignore */ }
+  };
 
   const loadUserTelefono = async () => {
     const me = await apiGet('/auth/me');
@@ -41,7 +86,7 @@ export default function CloserCalendario() {
   };
 
   const waLink = (telefono: string, mensaje: string) => {
-    const num = telefono.replace(/\D/g, '');
+    const num = telefono.replace(/¥D/g, '');
     return `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`;
   };
 
@@ -53,16 +98,38 @@ export default function CloserCalendario() {
       return fechaTurno > ahora && fechaTurno <= en30Min && t.alerta_enviada === 0;
     });
     setAlertas(alertasPendientes);
-    // En una app real, acá se enviaría push notification
     if (alertasPendientes.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
       alertasPendientes.forEach(t => {
-        new Notification('⏰ Turno en 30 min', { body: `${t.cliente_nombre} - ${t.tipo}` });
+        new Notification('⏰ Turno en 30 min', { body: `${t.cliente_nombre} - ${t.motivo}` });
       });
     }
   };
 
+  const openNew = () => {
+    setEditId(null);
+    setForm({
+      cliente_nombre: '', telefono: '', fecha_hora: '',
+      motivo: 'Consulta', producto_objetivo: 'Otro', modelo_detalle: '', que_busca: '',
+      presupuesto_estimado: '', moneda: 'USD', forma_pago: 'Efectivo',
+      senia: 'No aplica', monto_senia: '',
+      confirmado: 'Sin confirmar', canal_contacto: 'WhatsApp',
+      estado_recordatorio: 'Pendiente', notas: '', notificar_whatsapp: false
+    });
+    setDialogOpen(true);
+  };
+
+  const openEdit = (t: any) => {
+    setEditId(t.id);
+    setForm({ ...t, notificar_whatsapp: !!t.notificar_whatsapp });
+    setDialogOpen(true);
+  };
+
   const save = async () => {
-    await apiPost('/turnos', form);
+    if (editId) {
+      await apiPut(`/turnos/${editId}`, form);
+    } else {
+      await apiPost('/turnos', form);
+    }
     setDialogOpen(false);
     loadTurnos();
   };
@@ -73,7 +140,7 @@ export default function CloserCalendario() {
     loadTurnos();
   };
 
-  // Generar días del mes
+  // Generar dias del mes
   const year = selectedDate.getFullYear();
   const month = selectedDate.getMonth();
   const firstDay = new Date(year, month, 1);
@@ -95,27 +162,82 @@ export default function CloserCalendario() {
   for (let i = 0; i < startDay; i++) dias.push(null);
   for (let i = 1; i <= daysInMonth; i++) dias.push(i);
 
+  const ahora = new Date();
+  const en48hs = new Date(ahora.getTime() + 48 * 60 * 60000);
+
+  const turnosFiltrados = (() => {
+    switch (vista) {
+      case 'hoy':
+        return turnos.filter(t => {
+          const d = new Date(t.fecha_hora);
+          return d.toDateString() === ahora.toDateString();
+        });
+      case '48hs':
+        return turnos.filter(t => {
+          const d = new Date(t.fecha_hora);
+          return d >= ahora && d <= en48hs;
+        });
+      case 'sinConfirmar':
+        return turnos.filter(t => t.confirmado === 'Sin confirmar');
+      default:
+        return turnos;
+    }
+  })().sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
+
+  const colorPorConfirmado = (c: string) => {
+    switch (c) {
+      case 'Confirmado': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'Sin confirmar': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      case 'No responde': return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+      case 'Reprograma': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'Cancelado': return 'bg-red-500/10 text-red-400 border-red-500/20';
+      default: return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+    }
+  };
+
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-cyan-400" style={{ textShadow: '0 0 15px rgba(0,240,255,0.3)' }}>Calendario</h1>
-        <div className="flex items-center gap-3">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
+        <h1 className="text-2xl font-bold text-cyan-400" style={{ textShadow: '0 0 15px rgba(0,240,255,0.3)' }}>
+          Calendario
+        </h1>
+        <div className="flex items-center gap-2 flex-wrap">
           {alertas.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-pulse">
               <Bell className="w-4 h-4" /> {alertas.length} alerta{alertas.length > 1 ? 's' : ''}
             </div>
           )}
+          <div className="flex rounded-lg bg-[#0a0a0f] border border-cyan-500/10 overflow-hidden">
+            {([
+              { key: 'calendario', label: '📅' },
+              { key: 'hoy', label: '📋 Hoy' },
+              { key: '48hs', label: '⏰ 48hs' },
+              { key: 'sinConfirmar', label: '⚠️ Sin conf.' },
+              { key: 'todos', label: 'Todos' },
+            ] as const).map(v => (
+              <button
+                key={v.key}
+                onClick={() => setVista(v.key)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                  vista === v.key ? 'bg-cyan-500/20 text-cyan-300' : 'text-gray-400 hover:text-cyan-300'
+                }`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => setForm({ cliente_nombre: '', telefono: '', fecha_hora: '', tipo: 'Venta', notas: '' })}
+              <Button onClick={openNew}
                 className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20">
                 <Plus className="w-4 h-4 mr-1" /> Nuevo Turno
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-[#0d0d14] border border-cyan-500/30 text-white">
-              <DialogHeader><DialogTitle className="text-cyan-400">Nuevo Turno</DialogTitle></DialogHeader>
+            <DialogContent className="bg-[#0d0d14] border border-cyan-500/30 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle className="text-cyan-400">{editId ? 'Editar Turno' : 'Nuevo Turno'}</DialogTitle></DialogHeader>
               <div className="space-y-4 py-4">
-                {/* Config teléfono propio */}
+                {/* Telefono propio */}
                 {!userTelefono && !editTelefono && (
                   <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
                     <p className="text-xs text-amber-300 mb-2">⚠️ Configurá tu número de WhatsApp para recibir notificaciones de turnos</p>
@@ -130,21 +252,99 @@ export default function CloserCalendario() {
                     <Button onClick={saveTelefono} size="sm" className="bg-cyan-500 text-black">Guardar</Button>
                   </div>
                 )}
-                <div><Label className="text-cyan-300/80 text-sm">Cliente</Label>
-                  <Input value={form.cliente_nombre || ''} onChange={e => setForm({ ...form, cliente_nombre: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
+
+                {/* Cliente */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label className="text-cyan-300/80 text-sm">Cliente</Label>
+                    <Input value={form.cliente_nombre || ''} onChange={e => setForm({ ...form, cliente_nombre: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
+                  </div>
+                  <div><Label className="text-cyan-300/80 text-sm">Teléfono</Label>
+                    <Input value={form.telefono || ''} onChange={e => setForm({ ...form, telefono: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
+                  </div>
                 </div>
-                <div><Label className="text-cyan-300/80 text-sm">Teléfono del cliente</Label>
-                  <Input value={form.telefono || ''} onChange={e => setForm({ ...form, telefono: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
-                </div>
+
                 <div><Label className="text-cyan-300/80 text-sm">Fecha y Hora</Label>
                   <Input type="datetime-local" value={form.fecha_hora || ''} onChange={e => setForm({ ...form, fecha_hora: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
                 </div>
-                <div><Label className="text-cyan-300/80 text-sm">Tipo</Label>
-                  <select value={form.tipo || ''} onChange={e => setForm({ ...form, tipo: e.target.value })}
-                    className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
-                    {['Venta', 'Entrega', 'Canje', 'Consulta', 'Seguimiento'].map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
+
+                {/* Motivo y producto */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label className="text-cyan-300/80 text-sm">Motivo</Label>
+                    <select value={form.motivo || ''} onChange={e => setForm({ ...form, motivo: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      {MOTIVOS.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div><Label className="text-cyan-300/80 text-sm">Producto objetivo</Label>
+                    <select value={form.producto_objetivo || ''} onChange={e => setForm({ ...form, producto_objetivo: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      {PRODUCTOS.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
                 </div>
+
+                <div><Label className="text-cyan-300/80 text-sm">Modelo / Detalle</Label>
+                  <Input value={form.modelo_detalle || ''} onChange={e => setForm({ ...form, modelo_detalle: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" placeholder="Ej: iPhone 13 128GB batería 89%" />
+                </div>
+
+                <div><Label className="text-cyan-300/80 text-sm">¿Qué busca el cliente?</Label>
+                  <textarea value={form.que_busca || ''} onChange={e => setForm({ ...form, que_busca: e.target.value })} rows={2}
+                    className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white resize-none" />
+                </div>
+
+                {/* Presupuesto */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div><Label className="text-cyan-300/80 text-sm">Presupuesto</Label>
+                    <Input type="number" value={form.presupuesto_estimado || ''} onChange={e => setForm({ ...form, presupuesto_estimado: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
+                  </div>
+                  <div><Label className="text-cyan-300/80 text-sm">Moneda</Label>
+                    <select value={form.moneda || ''} onChange={e => setForm({ ...form, moneda: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      {MONEDAS.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div><Label className="text-cyan-300/80 text-sm">Forma de pago</Label>
+                    <select value={form.forma_pago || ''} onChange={e => setForm({ ...form, forma_pago: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      {FORMAS_PAGO.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Seña */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label className="text-cyan-300/80 text-sm">Seña</Label>
+                    <select value={form.senia || ''} onChange={e => setForm({ ...form, senia: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      {SENIAS.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div><Label className="text-cyan-300/80 text-sm">Monto seña</Label>
+                    <Input type="number" value={form.monto_senia || ''} onChange={e => setForm({ ...form, monto_senia: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
+                  </div>
+                </div>
+
+                {/* Confirmación y seguimiento */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label className="text-cyan-300/80 text-sm">Confirmado</Label>
+                    <select value={form.confirmado || ''} onChange={e => setForm({ ...form, confirmado: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      {CONFIRMADOS.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                  <div><Label className="text-cyan-300/80 text-sm">Canal de contacto</Label>
+                    <select value={form.canal_contacto || ''} onChange={e => setForm({ ...form, canal_contacto: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      {CANALES.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div><Label className="text-cyan-300/80 text-sm">Notas</Label>
+                  <textarea value={form.notas || ''} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2}
+                    className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white resize-none" />
+                </div>
+
                 <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/5 border border-green-500/20">
                   <input type="checkbox" id="notificar_whatsapp" checked={form.notificar_whatsapp} onChange={e => setForm({ ...form, notificar_whatsapp: e.target.checked })}
                     className="w-4 h-4 rounded border-green-500/30 bg-[#0a0a0f] text-green-400" />
@@ -152,13 +352,10 @@ export default function CloserCalendario() {
                     <MessageCircle className="w-3.5 h-3.5" /> Notificarme por WhatsApp 30 min antes
                   </Label>
                 </div>
-                <div><Label className="text-cyan-300/80 text-sm">Notas</Label>
-                  <textarea value={form.notas || ''} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2}
-                    className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white resize-none" />
-                </div>
-                <div className="flex justify-end gap-2">
+
+                <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-gray-600 text-gray-300">Cancelar</Button>
-                  <Button onClick={save} className="bg-cyan-500 text-black font-semibold">Guardar</Button>
+                  <Button onClick={save} className="bg-cyan-500 text-black font-semibold">{editId ? 'Guardar cambios' : 'Guardar'}</Button>
                 </div>
               </div>
             </DialogContent>
@@ -170,7 +367,7 @@ export default function CloserCalendario() {
       {alertas.length > 0 && (
         <div className="mb-4 space-y-2">
           {alertas.map(a => {
-            const mensaje = `⏰ Recordatorio: turno con ${a.cliente_nombre} en 30 min (${a.tipo}). Tel: ${a.telefono || 'no cargado'}`;
+            const mensaje = `⏰ Recordatorio: turno con ${a.cliente_nombre} en 30 min (${a.motivo}). Tel: ${a.telefono || 'no cargado'}`;
             const link = userTelefono ? waLink(userTelefono, mensaje) : null;
             return (
               <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20 animate-pulse">
@@ -178,7 +375,7 @@ export default function CloserCalendario() {
                   <Bell className="w-5 h-5 text-red-400" />
                   <div>
                     <p className="text-sm font-medium text-red-300">⏰ Turno en 30 minutos</p>
-                    <p className="text-xs text-gray-400">{a.cliente_nombre} — {a.tipo} — {new Date(a.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-xs text-gray-400">{a.cliente_nombre} — {a.motivo} — {new Date(a.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
                 </div>
                 {link && (
@@ -192,63 +389,105 @@ export default function CloserCalendario() {
         </div>
       )}
 
-      {/* Calendario */}
-      <div className="rounded-xl border border-cyan-500/10 bg-[#0d0d14]/50 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={() => setSelectedDate(new Date(year, month - 1, 1))} className="p-2 rounded-lg hover:bg-cyan-500/10 text-cyan-400">←</button>
-          <h2 className="text-lg font-semibold text-cyan-300">{selectedDate.toLocaleString('es-AR', { month: 'long', year: 'numeric' })}</h2>
-          <button onClick={() => setSelectedDate(new Date(year, month + 1, 1))} className="p-2 rounded-lg hover:bg-cyan-500/10 text-cyan-400">→</button>
+      {/* Vista Calendario */}
+      {vista === 'calendario' && (
+        <div className="rounded-xl border border-cyan-500/10 bg-[#0d0d14]/50 p-4">
+          <div className="flex items-center justify-between mb-4">
+            <button onClick={() => setSelectedDate(new Date(year, month - 1, 1))} className="p-2 rounded-lg hover:bg-cyan-500/10 text-cyan-400">←</button>
+            <h2 className="text-lg font-semibold text-cyan-300">{selectedDate.toLocaleString('es-AR', { month: 'long', year: 'numeric' })}</h2>
+            <button onClick={() => setSelectedDate(new Date(year, month + 1, 1))} className="p-2 rounded-lg hover:bg-cyan-500/10 text-cyan-400">→</button>
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
+              <div key={d} className="text-center text-xs text-cyan-400/50 py-2">{d}</div>
+            ))}
+            {dias.map((dia, i) => (
+              <div key={i} className={`min-h-[80px] rounded-lg border p-1 ${dia === new Date().getDate() && month === new Date().getMonth() ? 'border-cyan-500/30 bg-cyan-500/5' : 'border-cyan-500/5 bg-[#0a0a0f]/50'}`}>
+                {dia && (
+                  <>
+                    <span className="text-xs text-gray-400 font-medium">{dia}</span>
+                    <div className="mt-1 space-y-0.5">
+                      {(turnosPorDia[dia] || []).map(t => {
+                        const accion = accionSugerida(t);
+                        return (
+                          <div key={t.id} onClick={() => openEdit(t)}
+                            className={`text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer ${colorPorConfirmado(t.confirmado)} border`}
+                            title={`${t.cliente_nombre} - ${t.motivo}`}>
+                            {new Date(t.fecha_hora).getHours()}:00 {t.cliente_nombre.split(' ')[0]}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
+      )}
 
-        <div className="grid grid-cols-7 gap-1">
-          {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
-            <div key={d} className="text-center text-xs text-cyan-400/50 py-2">{d}</div>
-          ))}
-          {dias.map((dia, i) => (
-            <div key={i} className={`min-h-[80px] rounded-lg border p-1 ${dia === new Date().getDate() && month === new Date().getMonth() ? 'border-cyan-500/30 bg-cyan-500/5' : 'border-cyan-500/5 bg-[#0a0a0f]/50'}`}>
-              {dia && (
-                <>
-                  <span className="text-xs text-gray-400 font-medium">{dia}</span>
-                  <div className="mt-1 space-y-0.5">
-                    {(turnosPorDia[dia] || []).map(t => (
-                      <div key={t.id} className={`text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer ${
-                        t.tipo === 'Venta' ? 'bg-emerald-500/10 text-emerald-400' :
-                        t.tipo === 'Entrega' ? 'bg-blue-500/10 text-blue-400' :
-                        t.tipo === 'Canje' ? 'bg-orange-500/10 text-orange-400' :
-                        'bg-violet-500/10 text-violet-400'
-                      }`} title={`${t.cliente_nombre} - ${t.tipo}`}>
-                        {new Date(t.fecha_hora).getHours()}:00 {t.cliente_nombre.split(' ')[0]}
-                      </div>
-                    ))}
+      {/* Vistas de lista */}
+      {vista !== 'calendario' && (
+        <div className="space-y-3">
+          {turnosFiltrados.length === 0 && (
+            <p className="text-gray-500 text-sm text-center py-8">No hay turnos en esta vista</p>
+          )}
+          {turnosFiltrados.map(t => {
+            const accion = accionSugerida(t);
+            const mensaje = `Hola ${t.cliente_nombre}! Te confirmo el turno para ${t.motivo} el ${new Date(t.fecha_hora).toLocaleDateString('es-AR')} a las ${new Date(t.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}. ¿Confirmas asistencia?`;
+            const link = userTelefono && t.telefono ? waLink(t.telefono, mensaje) : null;
+            return (
+              <div key={t.id} className="p-4 rounded-xl border border-cyan-500/10 bg-[#0d0d14]/50">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-white">{t.cliente_nombre}</p>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full border ${colorPorConfirmado(t.confirmado)}`}>{t.confirmado}</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{t.motivo}</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {new Date(t.fecha_hora).toLocaleString('es-AR')} · {t.telefono}
+                      {t.producto_objetivo && ` · ${t.producto_objetivo}`}
+                      {t.modelo_detalle && ` · ${t.modelo_detalle}`}
+                    </p>
+                    {t.que_busca && <p className="text-xs text-gray-500 mt-1">📝 {t.que_busca}</p>}
+                    {(t.presupuesto_estimado > 0) && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        💰 Presupuesto: {t.presupuesto_estimado} {t.moneda}
+                        {t.senia === 'Señó' && ` · Seña: ${t.monto_senia} ${t.moneda}`}
+                      </p>
+                    )}
+                    {/* Acción sugerida */}
+                    <div className={`mt-2 flex items-center gap-2 text-xs px-2 py-1 rounded-lg border ${
+                      accion.color === 'red' ? 'bg-red-500/5 border-red-500/20 text-red-400' :
+                      accion.color === 'orange' ? 'bg-orange-500/5 border-orange-500/20 text-orange-400' :
+                      accion.color === 'green' ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400' :
+                      'bg-gray-500/5 border-gray-500/20 text-gray-400'
+                    }`}>
+                      <accion.icon className="w-3.5 h-3.5" />
+                      {accion.texto}
+                    </div>
                   </div>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Lista de turnos */}
-      <div className="mt-6 rounded-xl border border-cyan-500/10 bg-[#0d0d14]/50 p-4">
-        <h3 className="text-sm font-semibold text-cyan-300 mb-3">Próximos Turnos</h3>
-        <div className="space-y-2">
-          {turnos.filter(t => new Date(t.fecha_hora) >= new Date()).sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime()).map(t => (
-            <div key={t.id} className="flex items-center justify-between p-3 rounded-lg bg-black/20 border border-cyan-500/5">
-              <div className="flex items-center gap-3">
-                <div className={`w-2 h-2 rounded-full ${new Date(t.fecha_hora) <= new Date(Date.now() + 30*60000) ? 'bg-red-400 animate-pulse' : 'bg-cyan-400'}`} />
-                <div>
-                  <p className="text-sm text-white">{t.cliente_nombre}</p>
-                  <p className="text-xs text-gray-400">{t.tipo} — {new Date(t.fecha_hora).toLocaleString('es-AR')}</p>
+                  <div className="flex items-center gap-1">
+                    {link && (
+                      <a href={link} target="_blank" rel="noopener noreferrer"
+                        className="p-1.5 rounded hover:bg-green-500/10 text-green-400" title="WhatsApp">
+                        <MessageCircle className="w-4 h-4" />
+                      </a>
+                    )}
+                    <button onClick={() => openEdit(t)} className="p-1.5 rounded hover:bg-cyan-500/10 text-cyan-400" title="Editar">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => remove(t.id)} className="p-1.5 rounded hover:bg-red-500/10 text-red-400" title="Eliminar">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
-              <button onClick={() => remove(t.id)} className="p-1.5 rounded hover:bg-red-500/10 text-red-400"><Trash2 className="w-4 h-4" /></button>
-            </div>
-          ))}
-          {turnos.filter(t => new Date(t.fecha_hora) >= new Date()).length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-4">Sin turnos próximos</p>
-          )}
+            );
+          })}
         </div>
-      </div>
+      )}
     </div>
   );
 }
