@@ -7,18 +7,17 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  Plus, X, Bell, CalendarDays, Clock, Trash2, Pencil, MessageCircle, Phone,
-  AlertTriangle, CheckCircle, XCircle, RefreshCw, Filter, ChevronDown
+  Plus, Bell, Trash2, Pencil, MessageCircle, Phone,
+  AlertTriangle, CheckCircle, XCircle, Clock, Users
 } from 'lucide-react';
 
-const MOTIVOS = ['Retiro', 'Plan Canje', 'Reparación', 'Consulta', 'Garantía', 'Seña', 'Compra'];
-const PRODUCTOS = ['iPhone', 'Samsung', 'Motorola', 'Xiaomi', 'MacBook', 'Accesorios', 'Reparación', 'Otro'];
+const MOTIVOS = ['Retiro', 'Plan Canje', 'Reparacion', 'Consulta', 'Garantia', 'Sena', 'Compra'];
+const PRODUCTOS = ['iPhone', 'Samsung', 'Motorola', 'Xiaomi', 'MacBook', 'Accesorios', 'Reparacion', 'Otro'];
 const MONEDAS = ['USD', 'ARS', 'USDT'];
 const FORMAS_PAGO = ['Cuotas', 'Tarjeta', 'Efectivo', 'Transferencia', 'Plan Canje', 'Mixto', 'Efectivo + Tarjeta'];
-const SENIAS = ['No aplica', 'Sin seña', 'Señó'];
+const SENIAS = ['No aplica', 'Sin sena', 'Seno'];
 const CONFIRMADOS = ['Sin confirmar', 'Confirmado', 'No responde', 'Reprograma', 'Cancelado'];
 const CANALES = ['Instagram', 'WhatsApp', 'Llamada'];
-const RECORDATORIOS = ['Pendiente', 'Enviado', 'No aplica'];
 
 function accionSugerida(turno: any): { texto: string; color: string; icon: any } {
   const ahora = new Date().getTime();
@@ -26,20 +25,25 @@ function accionSugerida(turno: any): { texto: string; color: string; icon: any }
   const diffMin = Math.floor((fechaTurno - ahora) / 60000);
   const confirmado = turno.confirmado || 'Sin confirmar';
 
-  if (confirmado === 'Cancelado') return { texto: '❌ Cancelado - Sin acción', color: 'gray', icon: XCircle };
-  if (confirmado === 'Confirmado') return { texto: '✅ Confirmado - Sin acción necesaria', color: 'green', icon: CheckCircle };
-  if (confirmado === 'No responde') return { texto: '🔔 URGENTE: Escribile ahora para confirmar', color: 'orange', icon: AlertTriangle };
+  if (confirmado === 'Cancelado') return { texto: 'Cancelado - Sin accion', color: 'gray', icon: XCircle };
+  if (confirmado === 'Confirmado') return { texto: 'Confirmado - Sin accion necesaria', color: 'green', icon: CheckCircle };
+  if (confirmado === 'No responde') return { texto: 'URGENTE: Escribile ahora para confirmar', color: 'orange', icon: AlertTriangle };
 
   if (diffMin <= 15 && diffMin >= 0) {
-    return { texto: '🚨 MANDAR MENSAJE YA: ¿Seguís en camino?', color: 'red', icon: AlertTriangle };
+    return { texto: 'MANDAR MENSAJE YA: ¿Seguis en camino?', color: 'red', icon: AlertTriangle };
   }
   if (diffMin <= 120 && diffMin >= 0) {
-    return { texto: '🔔 URGENTE: Escribile ahora para confirmar asistencia', color: 'orange', icon: AlertTriangle };
+    return { texto: 'URGENTE: Escribile ahora para confirmar asistencia', color: 'orange', icon: AlertTriangle };
   }
   if (diffMin < 0) {
-    return { texto: '⏰ Turno pasado', color: 'gray', icon: Clock };
+    return { texto: 'Turno pasado', color: 'gray', icon: Clock };
   }
-  return { texto: '⏳ Pendiente de confirmación', color: 'blue', icon: Clock };
+  return { texto: 'Pendiente de confirmacion', color: 'blue', icon: Clock };
+}
+
+function waLink(telefono: string, mensaje: string) {
+  const num = telefono.replace(/[^0-9+]/g, '').replace(/^0/, '+54');
+  return `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`;
 }
 
 export default function CloserCalendario() {
@@ -49,30 +53,58 @@ export default function CloserCalendario() {
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<any>({});
   const [alertas, setAlertas] = useState<any[]>([]);
+  const [alertasUrgentes, setAlertasUrgentes] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
   const [userTelefono, setUserTelefono] = useState('');
   const [editTelefono, setEditTelefono] = useState(false);
   const [vista, setVista] = useState<'calendario' | 'hoy' | '48hs' | 'sinConfirmar' | 'todos'>('calendario');
-  const [clientes, setClientes] = useState<any[]>([]);
+  const [filtroVendedor, setFiltroVendedor] = useState<string>('todos');
+  const [closers, setClosers] = useState<any[]>([]);
+
+  const isAdmin = user?.rol === 'admin';
 
   useEffect(() => {
+    loadUser();
     loadTurnos();
-    loadUserTelefono();
-    loadClientes();
-    const interval = setInterval(checkAlertas, 60000);
+    const interval = setInterval(() => { loadTurnos(); checkAlertas(); }, 60000);
     checkAlertas();
     return () => clearInterval(interval);
   }, []);
 
-  const loadClientes = async () => {
+  const loadUser = async () => {
+    const me = await apiGet('/auth/me');
+    if (me) {
+      setUser(me);
+      setUserTelefono(me.telefono || '');
+      if (me.rol === 'admin') loadClosers();
+    }
+  };
+
+  const loadClosers = async () => {
     try {
-      const data = await apiGet('/clientes');
-      setClientes(Array.isArray(data) ? data : []);
+      const data = await apiGet('/closers');
+      setClosers(Array.isArray(data) ? data : []);
     } catch { /* ignore */ }
   };
 
-  const loadUserTelefono = async () => {
-    const me = await apiGet('/auth/me');
-    if (me?.telefono) setUserTelefono(me.telefono);
+  const loadTurnos = async () => {
+    const data = await apiGet('/turnos');
+    const arr = Array.isArray(data) ? data : [];
+    setTurnos(arr);
+    // Calcular alertas locales
+    const ahora = new Date().getTime();
+    const en15Min = ahora + 15 * 60000;
+    const en30Min = ahora + 30 * 60000;
+    const urg = arr.filter((t: any) => {
+      const fh = new Date(t.fecha_hora).getTime();
+      return fh > ahora && fh <= en15Min && t.estado !== 'Cancelado' && t.estado !== 'Completado';
+    });
+    const norm = arr.filter((t: any) => {
+      const fh = new Date(t.fecha_hora).getTime();
+      return fh > en15Min && fh <= en30Min && t.estado !== 'Cancelado' && t.estado !== 'Completado';
+    });
+    setAlertasUrgentes(urg);
+    setAlertas(norm);
   };
 
   const saveTelefono = async () => {
@@ -80,27 +112,10 @@ export default function CloserCalendario() {
     setEditTelefono(false);
   };
 
-  const loadTurnos = async () => {
-    const data = await apiGet('/turnos');
-    setTurnos(Array.isArray(data) ? data : []);
-  };
-
-  const waLink = (telefono: string, mensaje: string) => {
-    const num = telefono.replace(/¥D/g, '');
-    return `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`;
-  };
-
   const checkAlertas = () => {
-    const ahora = new Date();
-    const en30Min = new Date(ahora.getTime() + 30 * 60000);
-    const alertasPendientes = turnos.filter(t => {
-      const fechaTurno = new Date(t.fecha_hora);
-      return fechaTurno > ahora && fechaTurno <= en30Min && t.alerta_enviada === 0;
-    });
-    setAlertas(alertasPendientes);
-    if (alertasPendientes.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
-      alertasPendientes.forEach(t => {
-        new Notification('⏰ Turno en 30 min', { body: `${t.cliente_nombre} - ${t.motivo}` });
+    if (alertasUrgentes.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
+      alertasUrgentes.forEach(t => {
+        new Notification('TURNO EN 15 MIN', { body: `${t.cliente_nombre} - ${t.motivo}` });
       });
     }
   };
@@ -135,7 +150,7 @@ export default function CloserCalendario() {
   };
 
   const remove = async (id: number) => {
-    if (!confirm('¿Eliminar turno?')) return;
+    if (!confirm('Eliminar turno?')) return;
     await apiDelete(`/turnos/${id}`);
     loadTurnos();
   };
@@ -165,7 +180,7 @@ export default function CloserCalendario() {
   const ahora = new Date();
   const en48hs = new Date(ahora.getTime() + 48 * 60 * 60000);
 
-  const turnosFiltrados = (() => {
+  let turnosFiltrados = (() => {
     switch (vista) {
       case 'hoy':
         return turnos.filter(t => {
@@ -184,6 +199,11 @@ export default function CloserCalendario() {
     }
   })().sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime());
 
+  // Filtro por vendedor (solo admin)
+  if (isAdmin && filtroVendedor !== 'todos') {
+    turnosFiltrados = turnosFiltrados.filter(t => String(t.closer_id) === filtroVendedor);
+  }
+
   const colorPorConfirmado = (c: string) => {
     switch (c) {
       case 'Confirmado': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -195,19 +215,47 @@ export default function CloserCalendario() {
     }
   };
 
+  const mensajeWhatsApp = (t: any, tipo: 'cliente' | 'vendedor') => {
+    const fecha = new Date(t.fecha_hora).toLocaleDateString('es-AR');
+    const hora = new Date(t.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    if (tipo === 'cliente') {
+      return `Hola ${t.cliente_nombre}! Te confirmo el turno para ${t.motivo} el ${fecha} a las ${hora}. ¿Confirmas asistencia?`;
+    }
+    return `Hola ${t.closer_nombre || ''}! Recordatorio: tenes un turno con ${t.cliente_nombre} en 15 min (${t.motivo}). Cliente: ${t.telefono}`;
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-3">
         <h1 className="text-2xl font-bold text-cyan-400" style={{ textShadow: '0 0 15px rgba(0,240,255,0.3)' }}>
-          Calendario
+          Calendario {isAdmin && <span className="text-sm text-gray-400 font-normal">(Admin - Vista total)</span>}
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
-          {alertas.length > 0 && (
+          {/* Alertas urgentes (15 min) */}
+          {alertasUrgentes.length > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-pulse">
-              <Bell className="w-4 h-4" /> {alertas.length} alerta{alertas.length > 1 ? 's' : ''}
+              <AlertTriangle className="w-4 h-4" /> {alertasUrgentes.length} en 15 min
             </div>
           )}
+          {/* Alertas normales (30 min) */}
+          {alertas.length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
+              <Bell className="w-4 h-4" /> {alertas.length} en 30 min
+            </div>
+          )}
+
+          {/* Filtro por vendedor (solo admin) */}
+          {isAdmin && (
+            <select value={filtroVendedor} onChange={e => setFiltroVendedor(e.target.value)}
+              className="rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-1.5 text-xs text-white">
+              <option value="todos">Todos los vendedores</option>
+              {closers.map((c: any) => (
+                <option key={c.id} value={String(c.id)}>{c.nombre}</option>
+              ))}
+            </select>
+          )}
+
           <div className="flex rounded-lg bg-[#0a0a0f] border border-cyan-500/10 overflow-hidden">
             {([
               { key: 'calendario', label: '📅' },
@@ -216,31 +264,26 @@ export default function CloserCalendario() {
               { key: 'sinConfirmar', label: '⚠️ Sin conf.' },
               { key: 'todos', label: 'Todos' },
             ] as const).map(v => (
-              <button
-                key={v.key}
-                onClick={() => setVista(v.key)}
+              <button key={v.key} onClick={() => setVista(v.key)}
                 className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                   vista === v.key ? 'bg-cyan-500/20 text-cyan-300' : 'text-gray-400 hover:text-cyan-300'
-                }`}
-              >
+                }`}>
                 {v.label}
               </button>
             ))}
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={openNew}
-                className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20">
+              <Button onClick={openNew} className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20">
                 <Plus className="w-4 h-4 mr-1" /> Nuevo Turno
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-[#0d0d14] border border-cyan-500/30 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader><DialogTitle className="text-cyan-400">{editId ? 'Editar Turno' : 'Nuevo Turno'}</DialogTitle></DialogHeader>
               <div className="space-y-4 py-4">
-                {/* Telefono propio */}
                 {!userTelefono && !editTelefono && (
                   <div className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
-                    <p className="text-xs text-amber-300 mb-2">⚠️ Configurá tu número de WhatsApp para recibir notificaciones de turnos</p>
+                    <p className="text-xs text-amber-300 mb-2">⚠️ Configura tu numero de WhatsApp para recibir notificaciones de turnos</p>
                     <Button onClick={() => setEditTelefono(true)} size="sm" className="bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20">
                       <Phone className="w-3 h-3 mr-1" /> Configurar
                     </Button>
@@ -253,21 +296,28 @@ export default function CloserCalendario() {
                   </div>
                 )}
 
-                {/* Cliente */}
+                {/* Asignar vendedor (solo admin) */}
+                {isAdmin && (
+                  <div><Label className="text-cyan-300/80 text-sm">Vendedor asignado</Label>
+                    <select value={form.closer_id || ''} onChange={e => setForm({ ...form, closer_id: e.target.value })}
+                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
+                      <option value="">Seleccionar...</option>
+                      {closers.map((c: any) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label className="text-cyan-300/80 text-sm">Cliente</Label>
                     <Input value={form.cliente_nombre || ''} onChange={e => setForm({ ...form, cliente_nombre: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
                   </div>
-                  <div><Label className="text-cyan-300/80 text-sm">Teléfono</Label>
+                  <div><Label className="text-cyan-300/80 text-sm">Telefono</Label>
                     <Input value={form.telefono || ''} onChange={e => setForm({ ...form, telefono: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
                   </div>
                 </div>
-
                 <div><Label className="text-cyan-300/80 text-sm">Fecha y Hora</Label>
                   <Input type="datetime-local" value={form.fecha_hora || ''} onChange={e => setForm({ ...form, fecha_hora: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
                 </div>
-
-                {/* Motivo y producto */}
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label className="text-cyan-300/80 text-sm">Motivo</Label>
                     <select value={form.motivo || ''} onChange={e => setForm({ ...form, motivo: e.target.value })}
@@ -282,17 +332,13 @@ export default function CloserCalendario() {
                     </select>
                   </div>
                 </div>
-
                 <div><Label className="text-cyan-300/80 text-sm">Modelo / Detalle</Label>
-                  <Input value={form.modelo_detalle || ''} onChange={e => setForm({ ...form, modelo_detalle: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" placeholder="Ej: iPhone 13 128GB batería 89%" />
+                  <Input value={form.modelo_detalle || ''} onChange={e => setForm({ ...form, modelo_detalle: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" placeholder="Ej: iPhone 13 128GB bateria 89%" />
                 </div>
-
-                <div><Label className="text-cyan-300/80 text-sm">¿Qué busca el cliente?</Label>
+                <div><Label className="text-cyan-300/80 text-sm">¿Que busca el cliente?</Label>
                   <textarea value={form.que_busca || ''} onChange={e => setForm({ ...form, que_busca: e.target.value })} rows={2}
                     className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white resize-none" />
                 </div>
-
-                {/* Presupuesto */}
                 <div className="grid grid-cols-3 gap-3">
                   <div><Label className="text-cyan-300/80 text-sm">Presupuesto</Label>
                     <Input type="number" value={form.presupuesto_estimado || ''} onChange={e => setForm({ ...form, presupuesto_estimado: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
@@ -310,21 +356,17 @@ export default function CloserCalendario() {
                     </select>
                   </div>
                 </div>
-
-                {/* Seña */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label className="text-cyan-300/80 text-sm">Seña</Label>
+                  <div><Label className="text-cyan-300/80 text-sm">Sena</Label>
                     <select value={form.senia || ''} onChange={e => setForm({ ...form, senia: e.target.value })}
                       className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
                       {SENIAS.map(o => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </div>
-                  <div><Label className="text-cyan-300/80 text-sm">Monto seña</Label>
+                  <div><Label className="text-cyan-300/80 text-sm">Monto sena</Label>
                     <Input type="number" value={form.monto_senia || ''} onChange={e => setForm({ ...form, monto_senia: e.target.value })} className="mt-1 bg-[#0a0a0f] border-cyan-500/20 text-white" />
                   </div>
                 </div>
-
-                {/* Confirmación y seguimiento */}
                 <div className="grid grid-cols-2 gap-3">
                   <div><Label className="text-cyan-300/80 text-sm">Confirmado</Label>
                     <select value={form.confirmado || ''} onChange={e => setForm({ ...form, confirmado: e.target.value })}
@@ -339,12 +381,10 @@ export default function CloserCalendario() {
                     </select>
                   </div>
                 </div>
-
                 <div><Label className="text-cyan-300/80 text-sm">Notas</Label>
                   <textarea value={form.notas || ''} onChange={e => setForm({ ...form, notas: e.target.value })} rows={2}
                     className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white resize-none" />
                 </div>
-
                 <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/5 border border-green-500/20">
                   <input type="checkbox" id="notificar_whatsapp" checked={form.notificar_whatsapp} onChange={e => setForm({ ...form, notificar_whatsapp: e.target.checked })}
                     className="w-4 h-4 rounded border-green-500/30 bg-[#0a0a0f] text-green-400" />
@@ -352,7 +392,6 @@ export default function CloserCalendario() {
                     <MessageCircle className="w-3.5 h-3.5" /> Notificarme por WhatsApp 30 min antes
                   </Label>
                 </div>
-
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={() => setDialogOpen(false)} className="border-gray-600 text-gray-300">Cancelar</Button>
                   <Button onClick={save} className="bg-cyan-500 text-black font-semibold">{editId ? 'Guardar cambios' : 'Guardar'}</Button>
@@ -363,23 +402,67 @@ export default function CloserCalendario() {
         </div>
       </div>
 
-      {/* Alertas */}
+      {/* Alertas URGENTES (15 min) */}
+      {alertasUrgentes.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {alertasUrgentes.map(a => {
+            const msgCliente = mensajeWhatsApp(a, 'cliente');
+            const msgVendedor = mensajeWhatsApp(a, 'vendedor');
+            const linkCliente = a.telefono ? waLink(a.telefono, msgCliente) : null;
+            const linkVendedor = a.closer_telefono ? waLink(a.closer_telefono, msgVendedor) : null;
+            return (
+              <div key={a.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20 animate-pulse gap-2">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                  <div>
+                    <p className="text-sm font-medium text-red-300">🚨 TURNO EN 15 MINUTOS</p>
+                    <p className="text-xs text-gray-400">
+                      {a.cliente_nombre} — {a.motivo} — {new Date(a.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                      {isAdmin && a.closer_nombre && ` · Vendedor: ${a.closer_nombre}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {linkCliente && (
+                    <a href={linkCliente} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-medium">
+                      <MessageCircle className="w-3.5 h-3.5" /> Al cliente
+                    </a>
+                  )}
+                  {isAdmin && linkVendedor && (
+                    <a href={linkVendedor} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 text-xs font-medium">
+                      <Phone className="w-3.5 h-3.5" /> Al vendedor
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Alertas normales (30 min) */}
       {alertas.length > 0 && (
         <div className="mb-4 space-y-2">
           {alertas.map(a => {
-            const mensaje = `⏰ Recordatorio: turno con ${a.cliente_nombre} en 30 min (${a.motivo}). Tel: ${a.telefono || 'no cargado'}`;
-            const link = userTelefono ? waLink(userTelefono, mensaje) : null;
+            const msgCliente = mensajeWhatsApp(a, 'cliente');
+            const linkCliente = a.telefono ? waLink(a.telefono, msgCliente) : null;
             return (
-              <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-red-500/5 border border-red-500/20 animate-pulse">
+              <div key={a.id} className="flex items-center justify-between p-3 rounded-lg bg-orange-500/5 border border-orange-500/20">
                 <div className="flex items-center gap-3">
-                  <Bell className="w-5 h-5 text-red-400" />
+                  <Bell className="w-5 h-5 text-orange-400" />
                   <div>
-                    <p className="text-sm font-medium text-red-300">⏰ Turno en 30 minutos</p>
-                    <p className="text-xs text-gray-400">{a.cliente_nombre} — {a.motivo} — {new Date(a.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
+                    <p className="text-sm font-medium text-orange-300">⏰ Turno en 30 minutos</p>
+                    <p className="text-xs text-gray-400">
+                      {a.cliente_nombre} — {a.motivo} — {new Date(a.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}
+                      {isAdmin && a.closer_nombre && ` · Vendedor: ${a.closer_nombre}`}
+                    </p>
                   </div>
                 </div>
-                {link && (
-                  <a href={link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-medium">
+                {linkCliente && (
+                  <a href={linkCliente} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 text-xs font-medium">
                     <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                   </a>
                 )}
@@ -398,7 +481,7 @@ export default function CloserCalendario() {
             <button onClick={() => setSelectedDate(new Date(year, month + 1, 1))} className="p-2 rounded-lg hover:bg-cyan-500/10 text-cyan-400">→</button>
           </div>
           <div className="grid grid-cols-7 gap-1">
-            {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(d => (
+            {['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'].map(d => (
               <div key={d} className="text-center text-xs text-cyan-400/50 py-2">{d}</div>
             ))}
             {dias.map((dia, i) => (
@@ -407,16 +490,13 @@ export default function CloserCalendario() {
                   <>
                     <span className="text-xs text-gray-400 font-medium">{dia}</span>
                     <div className="mt-1 space-y-0.5">
-                      {(turnosPorDia[dia] || []).map(t => {
-                        const accion = accionSugerida(t);
-                        return (
-                          <div key={t.id} onClick={() => openEdit(t)}
-                            className={`text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer ${colorPorConfirmado(t.confirmado)} border`}
-                            title={`${t.cliente_nombre} - ${t.motivo}`}>
-                            {new Date(t.fecha_hora).getHours()}:00 {t.cliente_nombre.split(' ')[0]}
-                          </div>
-                        );
-                      })}
+                      {(turnosPorDia[dia] || []).map(t => (
+                        <div key={t.id} onClick={() => openEdit(t)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded truncate cursor-pointer ${colorPorConfirmado(t.confirmado)} border`}
+                          title={`${t.cliente_nombre} - ${t.motivo}${isAdmin && t.closer_nombre ? ` (${t.closer_nombre})` : ''}`}>
+                          {new Date(t.fecha_hora).getHours()}:00 {t.cliente_nombre.split(' ')[0]}
+                        </div>
+                      ))}
                     </div>
                   </>
                 )}
@@ -434,8 +514,8 @@ export default function CloserCalendario() {
           )}
           {turnosFiltrados.map(t => {
             const accion = accionSugerida(t);
-            const mensaje = `Hola ${t.cliente_nombre}! Te confirmo el turno para ${t.motivo} el ${new Date(t.fecha_hora).toLocaleDateString('es-AR')} a las ${new Date(t.fecha_hora).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}. ¿Confirmas asistencia?`;
-            const link = userTelefono && t.telefono ? waLink(t.telefono, mensaje) : null;
+            const msgCliente = mensajeWhatsApp(t, 'cliente');
+            const linkCliente = t.telefono ? waLink(t.telefono, msgCliente) : null;
             return (
               <div key={t.id} className="p-4 rounded-xl border border-cyan-500/10 bg-[#0d0d14]/50">
                 <div className="flex items-start justify-between gap-3">
@@ -444,6 +524,11 @@ export default function CloserCalendario() {
                       <p className="text-sm font-medium text-white">{t.cliente_nombre}</p>
                       <span className={`text-[10px] px-2 py-0.5 rounded-full border ${colorPorConfirmado(t.confirmado)}`}>{t.confirmado}</span>
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">{t.motivo}</span>
+                      {isAdmin && t.closer_nombre && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 flex items-center gap-1">
+                          <Users className="w-3 h-3" /> {t.closer_nombre}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-400 mt-1">
                       {new Date(t.fecha_hora).toLocaleString('es-AR')} · {t.telefono}
@@ -454,10 +539,9 @@ export default function CloserCalendario() {
                     {(t.presupuesto_estimado > 0) && (
                       <p className="text-xs text-gray-500 mt-1">
                         💰 Presupuesto: {t.presupuesto_estimado} {t.moneda}
-                        {t.senia === 'Señó' && ` · Seña: ${t.monto_senia} ${t.moneda}`}
+                        {t.senia === 'Seno' && ` · Sena: ${t.monto_senia} ${t.moneda}`}
                       </p>
                     )}
-                    {/* Acción sugerida */}
                     <div className={`mt-2 flex items-center gap-2 text-xs px-2 py-1 rounded-lg border ${
                       accion.color === 'red' ? 'bg-red-500/5 border-red-500/20 text-red-400' :
                       accion.color === 'orange' ? 'bg-orange-500/5 border-orange-500/20 text-orange-400' :
@@ -469,9 +553,9 @@ export default function CloserCalendario() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    {link && (
-                      <a href={link} target="_blank" rel="noopener noreferrer"
-                        className="p-1.5 rounded hover:bg-green-500/10 text-green-400" title="WhatsApp">
+                    {linkCliente && (
+                      <a href={linkCliente} target="_blank" rel="noopener noreferrer"
+                        className="p-1.5 rounded hover:bg-green-500/10 text-green-400" title="WhatsApp al cliente">
                         <MessageCircle className="w-4 h-4" />
                       </a>
                     )}

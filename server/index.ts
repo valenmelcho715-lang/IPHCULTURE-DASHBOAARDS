@@ -52,6 +52,7 @@ async function initDatabase() {
       { name: 'canal_contacto', type: 'TEXT' },
       { name: 'ultimo_contacto', type: 'DATETIME' },
       { name: 'estado_recordatorio', type: "TEXT DEFAULT 'Pendiente'" },
+      { name: 'alerta_15_enviada', type: 'INTEGER DEFAULT 0' },
     ];
     for (const col of columnsToAdd) {
       try {
@@ -125,10 +126,10 @@ async function initDatabase() {
             item.categoria, item.destacado || 0
           );
         }
-        console.log(`[SEED] Catálogo cargado: ${seed.length} productos`);
+        console.log(`[SEED] Catalogo cargado: ${seed.length} productos`);
       }
     } catch (e) {
-      console.error('[SEED] Error cargando catálogo:', e);
+      console.error('[SEED] Error cargando catalogo:', e);
     }
   }
 }
@@ -547,21 +548,21 @@ app.get('/api/admin/stats', authMiddleware, adminOnly, asyncHandler(async (req, 
 
 // ===== TURNOS (v2 - campos completos) =====
 app.get('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
-  let sql = 'SELECT * FROM turnos WHERE 1=1';
+  let sql = 'SELECT t.*, u.nombre as closer_nombre, u.telefono as closer_telefono FROM turnos t LEFT JOIN users u ON t.closer_id = u.id WHERE 1=1';
   const params: any[] = [];
   if (req.user.rol !== 'admin') {
-    sql += ' AND closer_id = ?';
+    sql += ' AND t.closer_id = ?';
     params.push(req.user.id);
   }
   if (req.query.confirmado) {
-    sql += ' AND confirmado = ?';
+    sql += ' AND t.confirmado = ?';
     params.push(req.query.confirmado);
   }
   if (req.query.desde && req.query.hasta) {
-    sql += ' AND fecha_hora BETWEEN ? AND ?';
+    sql += ' AND t.fecha_hora BETWEEN ? AND ?';
     params.push(req.query.desde, req.query.hasta);
   }
-  sql += ' ORDER BY fecha_hora ASC';
+  sql += ' ORDER BY t.fecha_hora ASC';
   res.json(await db.prepare(sql).all(...params));
 }));
 
@@ -627,6 +628,42 @@ app.delete('/api/turnos/:id', authMiddleware, asyncHandler(async (req, res) => {
   }
   await db.prepare('DELETE FROM turnos WHERE id = ?').run(req.params.id);
   res.json({ success: true });
+}));
+
+// ===== ALERTAS PENDIENTES (para el frontend) =====
+app.get('/api/turnos/alertas', authMiddleware, asyncHandler(async (req, res) => {
+  const ahora = new Date().toISOString();
+  const en15Min = new Date(Date.now() + 15 * 60000).toISOString();
+  const en30Min = new Date(Date.now() + 30 * 60000).toISOString();
+
+  // Alertas de 15 min (urgentes)
+  const alertas15 = await db.prepare(`
+    SELECT t.*, u.nombre as closer_nombre, u.telefono as closer_telefono
+    FROM turnos t
+    JOIN users u ON t.closer_id = u.id
+    WHERE t.fecha_hora BETWEEN ? AND ?
+      AND t.estado != 'Completado'
+      AND t.estado != 'Cancelado'
+      AND t.alerta_15_enviada = 0
+      AND t.notificar_whatsapp = 1
+      ${req.user.rol !== 'admin' ? 'AND t.closer_id = ?' : ''}
+  `).all(ahora, en15Min, ...(req.user.rol !== 'admin' ? [req.user.id] : []));
+
+  // Alertas de 30 min
+  const alertas30 = await db.prepare(`
+    SELECT t.*, u.nombre as closer_nombre, u.telefono as closer_telefono
+    FROM turnos t
+    JOIN users u ON t.closer_id = u.id
+    WHERE t.fecha_hora BETWEEN ? AND ?
+      AND t.estado != 'Completado'
+      AND t.estado != 'Cancelado'
+      AND t.alerta_enviada = 0
+      AND t.notificar_whatsapp = 1
+      AND t.fecha_hora > ?
+      ${req.user.rol !== 'admin' ? 'AND t.closer_id = ?' : ''}
+  `).all(en15Min, en30Min, en15Min, ...(req.user.rol !== 'admin' ? [req.user.id] : []));
+
+  res.json({ alertas15, alertas30 });
 }));
 
 // ===== STOCK CUSTOM ENDPOINTS (antes del CRUD generico) =====
@@ -704,8 +741,28 @@ app.use((req, res) => {
 setInterval(() => {
   (async () => {
     const ahora = new Date().toISOString();
+    const en15Min = new Date(Date.now() + 15 * 60000).toISOString();
     const en30Min = new Date(Date.now() + 30 * 60000).toISOString();
-    const turnosProximos = await db.prepare(`
+
+    // 1) Alertas URGENTES: 15 minutos antes
+    const turnos15Min = await db.prepare(`
+      SELECT t.*, u.telefono as closer_telefono, u.nombre as closer_nombre
+      FROM turnos t
+      JOIN users u ON t.closer_id = u.id
+      WHERE t.fecha_hora BETWEEN ? AND ?
+        AND t.estado != 'Completado'
+        AND t.estado != 'Cancelado'
+        AND t.alerta_15_enviada = 0
+        AND t.notificar_whatsapp = 1
+    `).all(ahora, en15Min);
+
+    for (const turno of turnos15Min) {
+      await db.prepare('UPDATE turnos SET alerta_15_enviada = 1 WHERE id = ?').run(turno.id);
+      console.log(`[ALERTA 15MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 15 min para ${turno.closer_nombre}`);
+    }
+
+    // 2) Alertas: 30 minutos antes (excluyendo los que ya fueron alertados a 15 min)
+    const turnos30Min = await db.prepare(`
       SELECT t.*, u.telefono as closer_telefono, u.nombre as closer_nombre
       FROM turnos t
       JOIN users u ON t.closer_id = u.id
@@ -714,11 +771,12 @@ setInterval(() => {
         AND t.estado != 'Cancelado'
         AND t.alerta_enviada = 0
         AND t.notificar_whatsapp = 1
-    `).all(ahora, en30Min);
+        AND t.fecha_hora > ?
+    `).all(en15Min, en30Min, en15Min);
 
-    for (const turno of turnosProximos) {
+    for (const turno of turnos30Min) {
       await db.prepare('UPDATE turnos SET alerta_enviada = 1 WHERE id = ?').run(turno.id);
-      console.log(`[ALERTA] Turno #${turno.id} - ${turno.cliente_nombre} en 30 min para ${turno.closer_nombre}`);
+      console.log(`[ALERTA 30MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 30 min para ${turno.closer_nombre}`);
     }
   })().catch(e => console.error('Error en cron de turnos:', e));
 }, 60000);
