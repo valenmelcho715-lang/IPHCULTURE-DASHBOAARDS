@@ -568,6 +568,9 @@ app.get('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
 
 app.post('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
   const d = req.body;
+  if (!d.fecha_hora) {
+    return res.status(400).json({ error: 'La fecha y hora del turno son obligatorias' });
+  }
   const closerId = req.user.rol === 'admin' ? parseInt(d.closer_id || req.user.id) : req.user.id;
   const result = await db.prepare(`
     INSERT INTO turnos (
@@ -607,7 +610,7 @@ app.post('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
   res.json({ id: result.lastInsertRowid });
 }));
   const d = req.body;
-  const closerId = req.user.rol === 'admin' ? (d.closer_id || req.user.id) : req.user.id;
+  const closerId = req.user.rol === 'admin' ? parseInt(d.closer_id || req.user.id) : req.user.id;
   const result = await db.prepare(`
     INSERT INTO turnos (
       titulo, cliente_nombre, telefono, fecha_hora,
@@ -631,8 +634,8 @@ app.post('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
     d.forma_pago || 'Efectivo',
     d.senia || 'No aplica',
     parseFloat(d.monto_senia) || 0,
-    d.cliente_id || null,
-    d.venta_id || null,
+    d.cliente_id ? parseInt(d.cliente_id) : null,
+    d.venta_id ? parseInt(d.venta_id) : null,
     closerId,
     d.confirmado || 'Sin confirmar',
     d.canal_contacto || 'WhatsApp',
