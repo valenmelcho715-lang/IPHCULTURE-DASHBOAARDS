@@ -185,13 +185,19 @@ app.post('/api/seed', asyncHandler(async (req, res) => {
 // ===== AUTH MIDDLEWARE =====
 const authMiddleware = (req: any, res: any, next: any) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) return res.status(401).json({ error: 'No token' });
+  if (!token) {
+    console.log('[AUTH] No token provided');
+    return res.status(401).json({ error: 'No token' });
+  }
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     req.user = decoded;
     next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
+  } catch (e: any) {
+    console.log('[AUTH] JWT verify failed:', e.message);
+    console.log('[AUTH] Token prefix:', token.substring(0, 40) + '...');
+    console.log('[AUTH] JWT_SECRET length:', JWT_SECRET.length, '| first3:', JWT_SECRET.substring(0, 3));
+    res.status(401).json({ error: 'Invalid token', detail: e.message });
   }
 };
 
