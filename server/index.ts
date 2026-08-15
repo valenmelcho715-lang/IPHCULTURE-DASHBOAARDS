@@ -7,7 +7,44 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import db from './db';
 
+import webpush from 'web-push';
+
 const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const JWT_SECRET = process.env.JWT_SECRET || 'iphone-culture-secret-2026';
+
+// ===== VAPID KEYS para Web Push =====
+let vapidKeys: { publicKey: string; privateKey: string } | null = null;
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  vapidKeys = {
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY,
+  };
+} else {
+  try {
+    vapidKeys = webpush.generateVAPIDKeys();
+    console.log('[VAPID] Claves generadas. Guardalas como variables de entorno:');
+    console.log('[VAPID] VAPID_PUBLIC_KEY=' + vapidKeys.publicKey);
+    console.log('[VAPID] VAPID_PRIVATE_KEY=' + vapidKeys.privateKey);
+  } catch (e) {
+    console.error('[VAPID] Error generando claves:', e);
+  }
+}
+
+if (vapidKeys) {
+  webpush.setVapidDetails(
+    'mailto:admin@iphoneculture.com',
+    vapidKeys.publicKey,
+    vapidKeys.privateKey
+  );
+}
+
+export const VAPID_PUBLIC_KEY = vapidKeys?.publicKey || '';
+
+// ===== ASYNC HANDLER HELPER =====
 const __dirname = path.dirname(__filename);
 
 const app = express();
@@ -66,6 +103,16 @@ async function initDatabase() {
     }
   } catch (e) {
     console.error('[MIGRATE] Error migrando turnos:', e);
+  }
+
+  try {
+    const pushSchemaPath = path.join(__dirname, 'schema_push.sql');
+    if (existsSync(pushSchemaPath)) {
+      await db.exec(readFileSync(pushSchemaPath, 'utf-8'));
+      console.log('[INIT] Push schema applied');
+    }
+  } catch (e) {
+    console.error('[INIT] Error applying push schema:', e);
   }
 
   // Seed usuarios si no existen
@@ -262,6 +309,34 @@ app.put('/api/auth/me/telefono', authMiddleware, asyncHandler(async (req, res) =
 app.get('/api/closers', authMiddleware, adminOnly, asyncHandler(async (req, res) => {
   const closers = await db.prepare("SELECT id, nombre, email FROM users WHERE rol = 'closer'").all();
   res.json(closers);
+}));
+
+app.get('/api/push/vapid-public-key', (req, res) => {
+  res.json({ publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/push/subscribe', authMiddleware, asyncHandler(async (req, res) => {
+  const { endpoint, keys } = req.body;
+  if (!endpoint || !keys?.p256dh || !keys?.auth) {
+    return res.status(400).json({ error: 'Subscription incompleta' });
+  }
+  try {
+    await db.prepare(`
+      INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth = excluded.auth
+    `).run(req.user.id, endpoint, keys.p256dh, keys.auth);
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('[PUSH] Error guardando subscription:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+}));
+
+app.post('/api/push/unsubscribe', authMiddleware, asyncHandler(async (req, res) => {
+  const { endpoint } = req.body;
+  await db.prepare('DELETE FROM push_subscriptions WHERE user_id = ? AND endpoint = ?').run(req.user.id, endpoint);
+  res.json({ success: true });
 }));
 
 // ===== NOTICIAS (todos ven, solo admin crea) =====
@@ -762,6 +837,26 @@ setInterval(() => {
     for (const turno of turnos15Min) {
       await db.prepare('UPDATE turnos SET alerta_15_enviada = 1 WHERE id = ?').run(turno.id);
       console.log(`[ALERTA 15MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 15 min para ${turno.closer_nombre}`);
+      // Enviar push notification
+      try {
+        const subs = await db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(turno.closer_id);
+        for (const sub of subs) {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            JSON.stringify({
+              title: 'Alerta URGENTE - Turno en 15 min',
+              body: `${turno.cliente_nombre} - ${turno.motivo || 'Consulta'} (${turno.telefono || 'Sin tel'})`,
+              tag: `turno-${turno.id}`,
+              data: { url: '/turnos', turnoId: turno.id }
+            })
+          );
+        }
+      } catch (e: any) {
+        console.error('[PUSH] Error enviando alerta 15min:', e.message);
+      }
+    }
+      await db.prepare('UPDATE turnos SET alerta_15_enviada = 1 WHERE id = ?').run(turno.id);
+      console.log(`[ALERTA 15MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 15 min para ${turno.closer_nombre}`);
     }
 
     // 2) Alertas: 30 minutos antes (excluyendo los que ya fueron alertados a 15 min)
@@ -778,6 +873,26 @@ setInterval(() => {
     `).all(en15Min, en30Min, en15Min);
 
     for (const turno of turnos30Min) {
+      await db.prepare('UPDATE turnos SET alerta_enviada = 1 WHERE id = ?').run(turno.id);
+      console.log(`[ALERTA 30MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 30 min para ${turno.closer_nombre}`);
+      // Enviar push notification
+      try {
+        const subs = await db.prepare('SELECT * FROM push_subscriptions WHERE user_id = ?').all(turno.closer_id);
+        for (const sub of subs) {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            JSON.stringify({
+              title: 'Recordatorio - Turno en 30 min',
+              body: `${turno.cliente_nombre} - ${turno.motivo || 'Consulta'} (${turno.telefono || 'Sin tel'})`,
+              tag: `turno-${turno.id}`,
+              data: { url: '/turnos', turnoId: turno.id }
+            })
+          );
+        }
+      } catch (e: any) {
+        console.error('[PUSH] Error enviando alerta 30min:', e.message);
+      }
+    }
       await db.prepare('UPDATE turnos SET alerta_enviada = 1 WHERE id = ?').run(turno.id);
       console.log(`[ALERTA 30MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 30 min para ${turno.closer_nombre}`);
     }

@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { apiGet } from '@/lib/api';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import {
-  DollarSign, TrendingUp, Award, ShoppingCart, CalendarDays, Target,
-  Mail, AlertCircle, ArrowRight, Smartphone, MessageCircle
+  DollarSign, TrendingUp, Award, ShoppingCart, CalendarDays,
+  Mail, AlertCircle, ArrowRight, Smartphone, MessageCircle, Bell, BellOff
 } from 'lucide-react';
 
 export default function CloserDashboard() {
   const { user } = useAuth();
+  const { subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications();
   const [metricas, setMetricas] = useState<any>(null);
   const [noticias, setNoticias] = useState<any[]>([]);
   const [mensajes, setMensajes] = useState<any[]>([]);
@@ -36,9 +38,25 @@ export default function CloserDashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gradient-cyan mb-1">¡Hola, {user?.nombre}!</h1>
-        <p className="text-gray-400 text-sm">Tu panel de control personal</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-3xl font-bold text-gradient-cyan mb-1">Hola, {user?.nombre}!</h1>
+          <p className="text-gray-400 text-sm">Tu panel de control personal</p>
+        </div>
+        {'Notification' in window && (
+          <button
+            onClick={subscribed ? unsubscribe : subscribe}
+            disabled={pushLoading}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+              subscribed
+                ? 'bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20'
+                : 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20'
+            }`}
+          >
+            {subscribed ? <BellOff className="w-4 h-4" /> : <Bell className="w-4 h-4" />}
+            {subscribed ? 'Notificaciones activas' : 'Activar alertas'}
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -46,11 +64,11 @@ export default function CloserDashboard() {
         <StatCard label="Hoy" value={`$${(metricas?.hoy?.total || 0).toLocaleString()}`} sub={`${metricas?.hoy?.c || 0} ventas`} icon={DollarSign} color="text-emerald-400" />
         <StatCard label="Semana" value={`$${(metricas?.semana?.total || 0).toLocaleString()}`} sub={`${metricas?.semana?.c || 0} ventas`} icon={TrendingUp} color="text-cyan-400" />
         <StatCard label="Mes" value={`$${(metricas?.mes?.total || 0).toLocaleString()}`} sub={`${metricas?.mes?.c || 0} ventas`} icon={ShoppingCart} color="text-violet-400" />
-        <StatCard label="Comisión Mes" value={`$${(metricas?.mes?.comision || 0).toLocaleString()}`} icon={Award} color="text-fuchsia-400" />
+        <StatCard label="Comision Mes" value={`$${(metricas?.mes?.comision || 0).toLocaleString()}`} icon={Award} color="text-fuchsia-400" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Mensajes no leídos */}
+        {/* Mensajes no leidos */}
         <div className="rounded-xl border border-cyan-500/10 bg-[#0d0d14]/50 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-cyan-300 flex items-center gap-2">
@@ -88,17 +106,17 @@ export default function CloserDashboard() {
           </div>
         </div>
 
-        {/* Próximos turnos */}
+        {/* Proximos turnos */}
         <div className="rounded-xl border border-cyan-500/10 bg-[#0d0d14]/50 p-4">
           <h3 className="text-sm font-semibold text-cyan-300 mb-3 flex items-center gap-2">
-            <CalendarDays className="w-4 h-4" /> Próximos Turnos
+            <CalendarDays className="w-4 h-4" /> Proximos Turnos
           </h3>
           {proximosTurnos.length === 0 ? (
-            <p className="text-gray-500 text-sm">Sin turnos próximos</p>
+            <p className="text-gray-500 text-sm">Sin turnos proximos</p>
           ) : (
             <div className="space-y-2">
               {proximosTurnos.map(t => {
-                const mensaje = `⏰ Recordatorio de turno con ${t.cliente_nombre} (${t.tipo}). Fecha: ${new Date(t.fecha_hora).toLocaleString('es-AR')}`;
+                const mensaje = `Recordatorio de turno con ${t.cliente_nombre} (${t.tipo}). Fecha: ${new Date(t.fecha_hora).toLocaleString('es-AR')}`;
                 const link = userTelefono ? waLink(userTelefono, mensaje) : null;
                 const en30Min = new Date(t.fecha_hora).getTime() <= Date.now() + 30 * 60000;
                 return (
@@ -129,16 +147,11 @@ export default function CloserDashboard() {
         {[
           { to: '/ventas', label: 'Nueva Venta', icon: ShoppingCart, color: 'from-emerald-500/20 to-emerald-500/5', border: 'border-emerald-500/20' },
           { to: '/calendario', label: 'Nuevo Turno', icon: CalendarDays, color: 'from-violet-500/20 to-violet-500/5', border: 'border-violet-500/20' },
-          { to: '/metricas', label: 'Mis Métricas', icon: TrendingUp, color: 'from-cyan-500/20 to-cyan-500/5', border: 'border-cyan-500/20' },
-          { to: '/catalogo', label: 'Catálogo', icon: Smartphone, color: 'from-fuchsia-500/20 to-fuchsia-500/5', border: 'border-fuchsia-500/20' },
+          { to: '/metricas', label: 'Mis Metricas', icon: TrendingUp, color: 'from-cyan-500/20 to-cyan-500/5', border: 'border-cyan-500/20' },
+          { to: '/catalogo', label: 'Catalogo', icon: Smartphone, color: 'from-fuchsia-500/20 to-fuchsia-500/5', border: 'border-fuchsia-500/20' },
         ].map(link => {
           const Icon = link.icon;
-          const waLink = (telefono: string, mensaje: string) => {
-    const num = telefono.replace(/\D/g, '');
-    return `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`;
-  };
-
-  return (
+          return (
             <Link key={link.to} to={link.to} className={`flex flex-col items-center gap-2 p-4 rounded-xl border ${link.border} bg-gradient-to-b ${link.color} hover:scale-105 transition-all`}>
               <Icon className="w-6 h-6 text-white/80" />
               <span className="text-xs font-medium text-white/80">{link.label}</span>
@@ -151,11 +164,6 @@ export default function CloserDashboard() {
 }
 
 function StatCard({ label, value, sub, icon: Icon, color }: { label: string; value: string; sub?: string; icon: any; color: string }) {
-  const waLink = (telefono: string, mensaje: string) => {
-    const num = telefono.replace(/\D/g, '');
-    return `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`;
-  };
-
   return (
     <div className="rounded-xl border border-cyan-500/10 bg-[#0d0d14] p-4 glow-cyan">
       <div className="flex items-center justify-between mb-2">
