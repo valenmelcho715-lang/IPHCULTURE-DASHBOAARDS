@@ -10,6 +10,19 @@ const client: Client = createClient({
   authToken: isLocal ? undefined : authToken 
 });
 
+// Helper para convertir BigInt a Number (Turso devuelve BigInt para IDs)
+function serializeValue(v: any): any {
+  if (typeof v === 'bigint') return Number(v);
+  if (v instanceof Date) return v.toISOString();
+  return v;
+}
+
+function serializeRow(row: Record<string, any>): Record<string, any> {
+  return Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k, serializeValue(v)])
+  );
+}
+
 // Wrapper compatible con better-sqlite3 (async)
 class TursoStatement {
   private sql: string;
@@ -23,23 +36,19 @@ class TursoStatement {
   async run(...args: any[]) {
     const result = await client.execute({ sql: this.sql, args });
     return { 
-      lastInsertRowid: result.lastInsertRowid || 0, 
+      lastInsertRowid: Number(result.lastInsertRowid) || 0, 
       changes: result.rowsAffected 
     };
   }
 
   async get(...args: any[]) {
     const result = await client.execute({ sql: this.sql, args });
-    return result.rows[0] ? Object.fromEntries(
-      Object.entries(result.rows[0]).map(([k, v]) => [k, v as any])
-    ) : null;
+    return result.rows[0] ? serializeRow(result.rows[0] as Record<string, any>) : null;
   }
 
   async all(...args: any[]) {
     const result = await client.execute({ sql: this.sql, args });
-    return result.rows.map(row => Object.fromEntries(
-      Object.entries(row).map(([k, v]) => [k, v as any])
-    ));
+    return result.rows.map(row => serializeRow(row as Record<string, any>));
   }
 }
 
