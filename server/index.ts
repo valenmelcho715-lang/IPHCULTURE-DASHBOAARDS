@@ -33,6 +33,40 @@ async function initDatabase() {
     console.error('[INIT] Error applying schema:', e);
   }
 
+  // Migracion: agregar columnas nuevas a turnos (v1 -> v2)
+  try {
+    const columnsToAdd = [
+      { name: 'titulo', type: 'TEXT' },
+      { name: 'motivo', type: 'TEXT' },
+      { name: 'producto_objetivo', type: 'TEXT' },
+      { name: 'modelo_detalle', type: 'TEXT' },
+      { name: 'que_busca', type: 'TEXT' },
+      { name: 'presupuesto_estimado', type: 'REAL' },
+      { name: 'moneda', type: 'TEXT' },
+      { name: 'forma_pago', type: 'TEXT' },
+      { name: 'senia', type: 'TEXT' },
+      { name: 'monto_senia', type: 'REAL' },
+      { name: 'cliente_id', type: 'INTEGER' },
+      { name: 'venta_id', type: 'INTEGER' },
+      { name: 'confirmado', type: "TEXT DEFAULT 'Sin confirmar'" },
+      { name: 'canal_contacto', type: 'TEXT' },
+      { name: 'ultimo_contacto', type: 'DATETIME' },
+      { name: 'estado_recordatorio', type: "TEXT DEFAULT 'Pendiente'" },
+    ];
+    for (const col of columnsToAdd) {
+      try {
+        await db.prepare(`ALTER TABLE turnos ADD COLUMN ${col.name} ${col.type}`).run();
+        console.log(`[MIGRATE] Columna ${col.name} agregada a turnos`);
+      } catch (e: any) {
+        if (!e.message?.includes('duplicate column')) {
+          console.log(`[MIGRATE] Columna ${col.name} ya existe o error:`, e.message);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[MIGRATE] Error migrando turnos:', e);
+  }
+
   // Seed usuarios si no existen
   try {
     const usersCount = await db.prepare('SELECT COUNT(*) as c FROM users').get() as any;
@@ -102,7 +136,7 @@ async function initDatabase() {
 app.use(cors());
 app.use(express.json());
 
-// ===== HEALTH / STATUS (público) =====
+// ===== HEALTH / STATUS (publico) =====
 app.get('/api/status', asyncHandler(async (req, res) => {
   const catalogoCount = (await db.prepare('SELECT COUNT(*) as c FROM catalogo').get() as any).c;
   const usersCount = (await db.prepare('SELECT COUNT(*) as c FROM users').get() as any).c;
@@ -116,21 +150,18 @@ app.post('/api/init', asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Init completado' });
 }));
 
-// ===== SEED FORZADO (usar con precaución) =====
+// ===== SEED FORZADO (usar con precaucion) =====
 app.post('/api/seed', asyncHandler(async (req, res) => {
   if (req.body.secret !== 'iphone-culture-2026-seed') {
     return res.status(403).json({ error: 'No autorizado' });
   }
   try {
-    // Seed catálogo completo
     if (existsSync(seedPath)) {
       const seed = JSON.parse(readFileSync(seedPath, 'utf-8'));
-      // Verificar si el constraint soporta Accesorio, si no, recrear tabla
       try {
         await db.prepare("INSERT INTO catalogo (producto, modelo, categoria) VALUES ('__test__', '__test__', 'Accesorio')").run();
         await db.prepare("DELETE FROM catalogo WHERE producto = '__test__'").run();
       } catch (e) {
-        // Recrear tabla con constraint actualizado
         await db.prepare("ALTER TABLE catalogo RENAME TO catalogo_old").run();
         await db.prepare(`CREATE TABLE catalogo (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -169,7 +200,6 @@ app.post('/api/seed', asyncHandler(async (req, res) => {
         );
       }
     }
-    // Reset contraseñas seed
     const adminHash = bcrypt.hashSync('admin123', 10);
     const ianHash = bcrypt.hashSync('ian2026!', 10);
     const mariaHash = bcrypt.hashSync('maria2026!', 10);
@@ -211,7 +241,7 @@ app.post('/api/auth/login', asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const user = await db.prepare('SELECT * FROM users WHERE email = ?').get(email);
   if (!user || !bcrypt.compareSync(password, (user as any).password_hash)) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
+    return res.status(401).json({ error: 'Credenciales invalidas' });
   }
   const token = jwt.sign({ id: (user as any).id, email: (user as any).email, rol: (user as any).rol, nombre: (user as any).nombre }, JWT_SECRET);
   res.json({ token, user: { id: (user as any).id, nombre: (user as any).nombre, email: (user as any).email, rol: (user as any).rol } });
@@ -416,7 +446,7 @@ app.get('/api/facturas/:id', authMiddleware, asyncHandler(async (req, res) => {
   res.json(item);
 }));
 
-// Endpoint público para ver factura por número (para enviar al cliente)
+// Endpoint publico para ver factura por numero (para enviar al cliente)
 app.get('/api/comprobante/:numero', asyncHandler(async (req, res) => {
   const item = await db.prepare(`
     SELECT f.*, u.nombre as closer_nombre,
@@ -515,7 +545,7 @@ app.get('/api/admin/stats', authMiddleware, adminOnly, asyncHandler(async (req, 
   res.json({ totalVentas, totalClientes, totalStock, leadsNuevos, porCloser });
 }));
 
-// ===== TURNOS =====
+// ===== TURNOS (v2 - campos completos) =====
 app.get('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
   let sql = 'SELECT * FROM turnos WHERE 1=1';
   const params: any[] = [];
@@ -523,15 +553,55 @@ app.get('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
     sql += ' AND closer_id = ?';
     params.push(req.user.id);
   }
+  if (req.query.confirmado) {
+    sql += ' AND confirmado = ?';
+    params.push(req.query.confirmado);
+  }
+  if (req.query.desde && req.query.hasta) {
+    sql += ' AND fecha_hora BETWEEN ? AND ?';
+    params.push(req.query.desde, req.query.hasta);
+  }
   sql += ' ORDER BY fecha_hora ASC';
   res.json(await db.prepare(sql).all(...params));
 }));
 
 app.post('/api/turnos', authMiddleware, asyncHandler(async (req, res) => {
-  const data = req.body;
-  const closerId = req.user.rol === 'admin' ? (data.closer_id || req.user.id) : req.user.id;
-  const result = await db.prepare('INSERT INTO turnos (cliente_nombre, telefono, fecha_hora, tipo, estado, closer_id, notas, notificar_whatsapp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-    data.cliente_nombre, data.telefono, data.fecha_hora, data.tipo || 'Venta', data.estado || 'Pendiente', closerId, data.notas || '', data.notificar_whatsapp ? 1 : 0
+  const d = req.body;
+  const closerId = req.user.rol === 'admin' ? (d.closer_id || req.user.id) : req.user.id;
+  const result = await db.prepare(`
+    INSERT INTO turnos (
+      titulo, cliente_nombre, telefono, fecha_hora,
+      motivo, producto_objetivo, modelo_detalle, que_busca,
+      presupuesto_estimado, moneda, forma_pago, senia, monto_senia,
+      cliente_id, venta_id, closer_id,
+      confirmado, canal_contacto, ultimo_contacto, estado_recordatorio,
+      tipo, estado, notas, notificar_whatsapp
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    d.titulo || `${d.cliente_nombre || ''} - ${d.motivo || 'Consulta'}`,
+    d.cliente_nombre || '',
+    d.telefono || '',
+    d.fecha_hora,
+    d.motivo || 'Consulta',
+    d.producto_objetivo || 'Otro',
+    d.modelo_detalle || '',
+    d.que_busca || '',
+    parseFloat(d.presupuesto_estimado) || 0,
+    d.moneda || 'USD',
+    d.forma_pago || 'Efectivo',
+    d.senia || 'No aplica',
+    parseFloat(d.monto_senia) || 0,
+    d.cliente_id || null,
+    d.venta_id || null,
+    closerId,
+    d.confirmado || 'Sin confirmar',
+    d.canal_contacto || 'WhatsApp',
+    d.ultimo_contacto || null,
+    d.estado_recordatorio || 'Pendiente',
+    d.tipo || 'Consulta',
+    d.estado || 'Pendiente',
+    d.notas || '',
+    d.notificar_whatsapp ? 1 : 0
   );
   res.json({ id: result.lastInsertRowid });
 }));
@@ -543,8 +613,9 @@ app.put('/api/turnos/:id', authMiddleware, asyncHandler(async (req, res) => {
     return res.status(403).json({ error: 'No autorizado' });
   }
   const data = req.body;
-  const updates = Object.keys(data).filter(k => data[k] !== undefined && k !== 'id').map(k => `${k} = ?`).join(', ');
-  await db.prepare(`UPDATE turnos SET ${updates} WHERE id = ?`).run(...Object.keys(data).filter(k => data[k] !== undefined && k !== 'id').map(k => data[k]), req.params.id);
+  const keys = Object.keys(data).filter(k => data[k] !== undefined && k !== 'id');
+  const setClause = keys.map(k => `${k} = ?`).join(', ');
+  await db.prepare(`UPDATE turnos SET ${setClause} WHERE id = ?`).run(...keys.map(k => data[k]), req.params.id);
   res.json({ success: true });
 }));
 
@@ -558,14 +629,12 @@ app.delete('/api/turnos/:id', authMiddleware, asyncHandler(async (req, res) => {
   res.json({ success: true });
 }));
 
-// ===== STOCK CUSTOM ENDPOINTS (antes del CRUD genérico) =====
-// Eliminar TODO el stock (solo admin)
+// ===== STOCK CUSTOM ENDPOINTS (antes del CRUD generico) =====
 app.delete('/api/stock', authMiddleware, adminOnly, asyncHandler(async (req, res) => {
   await db.prepare('DELETE FROM stock').run();
   res.json({ success: true, message: 'Stock eliminado completamente' });
 }));
 
-// Ajustar cantidad de un producto (+N o -N)
 app.post('/api/stock/:id/ajustar', authMiddleware, adminOnly, asyncHandler(async (req, res) => {
   const { cantidad } = req.body;
   const item = await db.prepare('SELECT * FROM stock WHERE id = ?').get(req.params.id) as any;
@@ -631,12 +700,11 @@ app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
-// ===== CRON: Revisar turnos próximos cada minuto =====
+// ===== CRON: Revisar turnos proximos cada minuto =====
 setInterval(() => {
   (async () => {
     const ahora = new Date().toISOString();
     const en30Min = new Date(Date.now() + 30 * 60000).toISOString();
-    // Buscar turnos en los próximos 30 min que no hayan sido alertados
     const turnosProximos = await db.prepare(`
       SELECT t.*, u.telefono as closer_telefono, u.nombre as closer_nombre
       FROM turnos t

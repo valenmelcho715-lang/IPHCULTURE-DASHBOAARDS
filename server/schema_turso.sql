@@ -99,14 +99,36 @@ CREATE TABLE IF NOT EXISTS stock (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+-- TURNOS v2: tabla completa con todos los campos de la guía
 CREATE TABLE IF NOT EXISTS turnos (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  cliente_nombre TEXT NOT NULL,
+  titulo TEXT,
+  cliente_nombre TEXT,
   telefono TEXT,
   fecha_hora DATETIME NOT NULL,
+  -- Motivo y contexto comercial
+  motivo TEXT CHECK(motivo IN ('Retiro','Plan Canje','Reparación','Consulta','Garantía','Seña','Compra')),
+  producto_objetivo TEXT CHECK(producto_objetivo IN ('iPhone','Samsung','Motorola','Xiaomi','MacBook','Accesorios','Reparación','Otro')),
+  modelo_detalle TEXT,
+  que_busca TEXT,
+  presupuesto_estimado REAL,
+  moneda TEXT CHECK(moneda IN ('USD','ARS','USDT')),
+  -- Pago y seña
+  forma_pago TEXT CHECK(forma_pago IN ('Cuotas','Tarjeta','Efectivo','Transferencia','Plan Canje','Mixto','Efectivo + Tarjeta')),
+  senia TEXT CHECK(senia IN ('No aplica','Sin seña','Señó')),
+  monto_senia REAL,
+  -- Vínculos
+  cliente_id INTEGER,
+  venta_id INTEGER,
+  closer_id INTEGER NOT NULL,
+  -- Confirmación y seguimiento
+  confirmado TEXT DEFAULT 'Sin confirmar' CHECK(confirmado IN ('Sin confirmar','Confirmado','No responde','Reprograma','Cancelado')),
+  canal_contacto TEXT CHECK(canal_contacto IN ('Instagram','WhatsApp','Llamada')),
+  ultimo_contacto DATETIME,
+  estado_recordatorio TEXT DEFAULT 'Pendiente' CHECK(estado_recordatorio IN ('Pendiente','Enviado','No aplica')),
+  -- Campos legacy / compatibilidad
   tipo TEXT CHECK(tipo IN ('Venta','Entrega','Canje','Consulta','Seguimiento')),
   estado TEXT DEFAULT 'Pendiente' CHECK(estado IN ('Pendiente','Confirmado','Completado','Cancelado')),
-  closer_id INTEGER NOT NULL,
   notas TEXT,
   alerta_enviada INTEGER DEFAULT 0,
   notificar_whatsapp INTEGER DEFAULT 0,
