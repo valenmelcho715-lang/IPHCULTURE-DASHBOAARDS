@@ -5,9 +5,8 @@ import express from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import db from './db';
-
 import webpush from 'web-push';
+import db from './db';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,12 +43,6 @@ if (vapidKeys) {
 
 export const VAPID_PUBLIC_KEY = vapidKeys?.publicKey || '';
 
-// ===== ASYNC HANDLER HELPER =====
-const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'iphone-culture-secret-2026';
 // ===== ASYNC HANDLER HELPER =====
 const asyncHandler = (fn: Function) => (req: any, res: any, next: any) => {
   Promise.resolve(fn(req, res, next)).catch(next);
@@ -855,9 +848,6 @@ setInterval(() => {
         console.error('[PUSH] Error enviando alerta 15min:', e.message);
       }
     }
-      await db.prepare('UPDATE turnos SET alerta_15_enviada = 1 WHERE id = ?').run(turno.id);
-      console.log(`[ALERTA 15MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 15 min para ${turno.closer_nombre}`);
-    }
 
     // 2) Alertas: 30 minutos antes (excluyendo los que ya fueron alertados a 15 min)
     const turnos30Min = await db.prepare(`
@@ -892,9 +882,6 @@ setInterval(() => {
       } catch (e: any) {
         console.error('[PUSH] Error enviando alerta 30min:', e.message);
       }
-    }
-      await db.prepare('UPDATE turnos SET alerta_enviada = 1 WHERE id = ?').run(turno.id);
-      console.log(`[ALERTA 30MIN] Turno #${turno.id} - ${turno.cliente_nombre} en 30 min para ${turno.closer_nombre}`);
     }
   })().catch(e => console.error('Error en cron de turnos:', e));
 }, 60000);
