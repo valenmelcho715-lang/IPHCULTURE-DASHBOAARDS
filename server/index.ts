@@ -83,6 +83,7 @@ async function initDatabase() {
       { name: 'ultimo_contacto', type: 'DATETIME' },
       { name: 'estado_recordatorio', type: "TEXT DEFAULT 'Pendiente'" },
       { name: 'alerta_15_enviada', type: 'INTEGER DEFAULT 0' },
+      { name: 'notificar_whatsapp', type: 'INTEGER DEFAULT 0' },
     ];
     for (const col of columnsToAdd) {
       try {
@@ -96,6 +97,25 @@ async function initDatabase() {
     }
   } catch (e) {
     console.error('[MIGRATE] Error migrando turnos:', e);
+  }
+
+  // Migracion: agregar columnas nuevas a ventas (v1 -> v2)
+  try {
+    const ventasColumns = [
+      { name: 'comprobante_pdf', type: 'TEXT' },
+    ];
+    for (const col of ventasColumns) {
+      try {
+        await db.prepare(`ALTER TABLE ventas ADD COLUMN ${col.name} ${col.type}`).run();
+        console.log(`[MIGRATE] Columna ${col.name} agregada a ventas`);
+      } catch (e: any) {
+        if (!e.message?.includes('duplicate column')) {
+          console.log(`[MIGRATE] Columna ${col.name} ya existe o error:`, e.message);
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[MIGRATE] Error migrando ventas:', e);
   }
 
   try {
@@ -266,27 +286,6 @@ app.post('/api/seed', asyncHandler(async (req, res) => {
     await db.prepare("UPDATE users SET password_hash = ? WHERE email = 'maria.fuentes@iphoneculture.com'").run(mariaHash);
     await db.prepare("UPDATE users SET password_hash = ? WHERE email = 'oficina@iphoneculture.com'").run(oficinaHash);
     res.json({ success: true, message: 'Seed completado' });
-      const stmt = db.prepare(`
-        INSERT INTO catalogo (producto, modelo, descripcion, precio_contado_usd, precio_regular_usd,
-          cuotas_3, cuotas_6, cuotas_9, cuotas_12, categoria, destacado)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-      for (const item of seed) {
-        await stmt.run(
-          item.producto, item.modelo, item.descripcion || '',
-          item.precio_contado_usd, item.precio_regular_usd,
-          item.cuotas_3, item.cuotas_6, item.cuotas_9, item.cuotas_12,
-          item.categoria, item.destacado || 0
-        );
-      }
-    }
-    const adminHash = bcrypt.hashSync('admin123', 10);
-    const ianHash = bcrypt.hashSync('ian2026!', 10);
-    const mariaHash = bcrypt.hashSync('maria2026!', 10);
-    await db.prepare("UPDATE users SET password_hash = ? WHERE email = 'admin@iphoneculture.com'").run(adminHash);
-    await db.prepare("UPDATE users SET password_hash = ? WHERE email = 'ian@iphoneculture.com'").run(ianHash);
-    await db.prepare("UPDATE users SET password_hash = ? WHERE email = 'maria.fuentes@iphoneculture.com'").run(mariaHash);
-    res.json({ success: true, message: 'Seed completado' });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -319,9 +318,6 @@ const adminOnly = (req: any, res: any, next: any) => {
 // Middleware para lectura: admin y oficina pueden ver todo
 const viewerOnly = (req: any, res: any, next: any) => {
   if (req.user.rol !== 'admin' && req.user.rol !== 'oficina') return res.status(403).json({ error: 'Solo admin u oficina' });
-  next();
-};
-  if (req.user.rol !== 'admin') return res.status(403).json({ error: 'Solo admin' });
   next();
 };
 

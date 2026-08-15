@@ -11,11 +11,11 @@ import {
   AlertTriangle, CheckCircle, XCircle, Clock, Users
 } from 'lucide-react';
 
-const MOTIVOS = ['Retiro', 'Plan Canje', 'Reparacion', 'Consulta', 'Garantia', 'Sena', 'Compra'];
-const PRODUCTOS = ['iPhone', 'Samsung', 'Motorola', 'Xiaomi', 'MacBook', 'Accesorios', 'Reparacion', 'Otro'];
+const MOTIVOS = ['Retiro', 'Plan Canje', 'Reparación', 'Consulta', 'Garantía', 'Seña', 'Compra'];
+const PRODUCTOS = ['iPhone', 'Samsung', 'Motorola', 'Xiaomi', 'MacBook', 'Accesorios', 'Reparación', 'Otro'];
 const MONEDAS = ['USD', 'ARS', 'USDT'];
 const FORMAS_PAGO = ['Cuotas', 'Tarjeta', 'Efectivo', 'Transferencia', 'Plan Canje', 'Mixto', 'Efectivo + Tarjeta'];
-const SENIAS = ['No aplica', 'Sin sena', 'Seno'];
+const SENIAS = ['No aplica', 'Sin seña', 'Señó'];
 const CONFIRMADOS = ['Sin confirmar', 'Confirmado', 'No responde', 'Reprograma', 'Cancelado'];
 const CANALES = ['Instagram', 'WhatsApp', 'Llamada'];
 
@@ -300,15 +300,6 @@ export default function CloserCalendario() {
                 {isAdmin && (
                   <div><Label className="text-cyan-300/80 text-sm">Vendedor asignado</Label>
                     <select value={form.closer_id || ''} onChange={e => setForm({ ...form, closer_id: parseInt(e.target.value) || null })}
-                      className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
-                      <option value="">Seleccionar...</option>
-                      {closers.map((c: any) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                    </select>
-                  </div>
-                )}
-                {isAdmin && (
-                  <div><Label className="text-cyan-300/80 text-sm">Vendedor asignado</Label>
-                    <select value={form.closer_id || ''} onChange={e => setForm({ ...form, closer_id: e.target.value })}
                       className="mt-1 w-full rounded-md bg-[#0a0a0f] border border-cyan-500/20 px-3 py-2 text-sm text-white">
                       <option value="">Seleccionar...</option>
                       {closers.map((c: any) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
