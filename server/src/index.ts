@@ -3,7 +3,7 @@ import './config';
 import { initAutomation } from './automation/schema';
 import { automationRouter } from './automation/routes';
 import { metaRouter } from './automation/meta';
-import { startWorker } from './automation/worker';
+import { startWorker,stopWorker } from './automation/worker';
 // ============================================================
 // index.ts — CONTRATO COMPARTIDO (solo el orquestador lo modifica)
 // Express app: monta todas las rutas /api/*, sirve el build del cliente.
@@ -16,6 +16,9 @@ import fs from 'fs';
 import { initDb, db } from './db';
 import { authRequired } from './auth';
 import {securityHeaders} from './security';
+import {apiErrorHandler,apiNotFound} from './errors';
+import {healthHandler} from './health';
+import type {Server} from 'node:http';
 
 import authRoutes from './routes/auth';
 import catalogoRoutes from './routes/catalogo';
@@ -60,7 +63,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'iphone-culture', time: new Date().toISOString() }));
+app.get('/api/health',healthHandler);
 
 app.use('/api/auth', authRoutes);
 // Comprobante público ANTES de cualquier router con auth global montado en /api
@@ -109,18 +112,38 @@ if (fs.existsSync(clientDist)) {
   });
 }
 
-// ---------- Backup automático diario de la base de datos ----------
+app.use('/api',apiNotFound);
+app.use(apiErrorHandler);
+
+// ---------- Backup automático de la base de datos ----------
 async function backupDiario(): Promise<void> {try{await runBackup();}catch{console.error('[backup] No se pudo completar el respaldo; revisar Almacenamiento en el panel');}}
 
 const PORT = Number(process.env.PORT || 8080);
+let server:Server|undefined,backupTimer:NodeJS.Timeout|undefined,backupTask:Promise<void>|null=null,shuttingDown=false;
+function scheduleBackup(){
+  if(!backupTask)backupTask=backupDiario().finally(()=>{backupTask=null;});
+  return backupTask;
+}
+
+async function shutdown(signal:string){
+  if(shuttingDown)return;shuttingDown=true;console.log(`[iphone-culture] Apagado ordenado por ${signal}`);
+  if(backupTimer)clearInterval(backupTimer);
+  const forced=setTimeout(()=>{console.error('[iphone-culture] El apagado excedió el plazo seguro');process.exit(1);},40000);forced.unref();
+  try{
+    if(server)await new Promise<void>((resolve,reject)=>server!.close(error=>error?reject(error):resolve()));
+    await stopWorker();if(backupTask)await backupTask;db.close();clearTimeout(forced);process.exitCode=0;
+  }catch{console.error('[iphone-culture] No se pudo completar el apagado ordenado');process.exit(1);}
+}
+process.once('SIGTERM',()=>void shutdown('SIGTERM'));
+process.once('SIGINT',()=>void shutdown('SIGINT'));
 
 initDb()
   .then(async () => {
     await initAutomation();
     await startWorker();
-    void backupDiario(); // backup al arrancar
-    setInterval(backupDiario, backupIntervalMinutes() * 60 * 1000); // y una vez por día
-    app.listen(PORT, process.env.HOST || '127.0.0.1', () => console.log(`[iphone-culture] API lista en http://localhost:${PORT}`));
+    void scheduleBackup(); // backup al arrancar
+    backupTimer=setInterval(()=>void scheduleBackup(), backupIntervalMinutes() * 60 * 1000);
+    server=app.listen(PORT, process.env.HOST || '127.0.0.1', () => console.log(`[iphone-culture] API lista en http://localhost:${PORT}`));
   })
   .catch((err) => {
     console.error('Error inicializando DB', err);

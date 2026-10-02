@@ -45,6 +45,10 @@ before(async()=>{
   app.use('/api/ventas',require('../server/dist/routes/ventas').default);
   app.use('/api/turnos',require('../server/dist/routes/turnos').default);
   app.use('/api/reportes',require('../server/dist/routes/mejoras').default);
+  app.get('/api/health',require('../server/dist/health').healthHandler);
+  app.get('/api/error-controlado',(_req,_res,next)=>next(new repo.BusinessError('Solicitud de prueba inválida',422)));
+  app.use('/api',require('../server/dist/errors').apiNotFound);
+  app.use(require('../server/dist/errors').apiErrorHandler);
   server=app.listen(0,'127.0.0.1');await new Promise((resolve,reject)=>{server.once('listening',resolve);server.once('error',reject);});base=`http://127.0.0.1:${server.address().port}`;
 });
 after(async()=>{global.fetch=offlineFetch;await new Promise(resolve=>server.close(resolve));db.close();fs.rmSync(temporary,{recursive:true,force:true});});
@@ -62,6 +66,11 @@ test('El navegador recibe protección y el login frena intentos repetidos',async
   assert.equal(response.status,401);
   response=await realFetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'ataque@example.test',password:'incorrecta'})});
   assert.equal(response.status,429);assert.ok(Number(response.headers.get('retry-after'))>0);
+});
+test('Los errores API son JSON seguro y las rutas inexistentes no filtran detalles',async()=>{
+  let response=await realFetch(base+'/api/health');assert.equal(response.status,200);assert.equal((await response.json()).database,'available');
+  response=await realFetch(base+'/api/error-controlado');assert.equal(response.status,422);assert.deepEqual(await response.json(),{error:'Solicitud de prueba inválida'});
+  response=await realFetch(base+'/api/no-existe');assert.equal(response.status,404);assert.deepEqual(await response.json(),{error:'Ruta no encontrada'});
 });
 test('Cuotas reproducen el PDF comercial y la cotización indicada por el dueño',async()=>{
   const fees=(await db.execute('SELECT * FROM cuotas_fees WHERE cuotas=12')).rows[0];
