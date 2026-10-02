@@ -9,10 +9,16 @@
   "scripts": {
     "dev": "concurrently -n server,client -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client && npm run build -w server",
+    "lint": "npm run lint -w client",
     "start": "node server/dist/index.js",
-    "test": "npm run build -w server && node --test tests/automation.test.cjs",
+    "test": "npm run build -w server && node --test --test-concurrency=1 tests/*.test.cjs",
+    "test:ui": "node scripts/review-ui.cjs",
+    "migration:export": "node scripts/export-database.cjs",
+    "migration:check": "python3 scripts/check-migration.py",
     "demo": "npm run build && node scripts/demo.cjs",
-    "doctor": "node scripts/doctor.cjs"
+    "doctor": "node scripts/doctor.cjs",
+    "preflight": "node scripts/doctor.cjs --strict",
+    "preflight:live": "node scripts/doctor.cjs --strict --live"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

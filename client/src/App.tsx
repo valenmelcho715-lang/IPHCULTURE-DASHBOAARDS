@@ -1,35 +1,36 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import CustomCursor from '@/components/layout/CustomCursor';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import Login from '@/pages/Login';
+const DashboardLayout = lazy(() => import('@/components/layout/DashboardLayout'));
+const Login = lazy(() => import('@/pages/Login'));
 
 // Admin pages
-import AdminDashboard from '@/pages/admin/AdminDashboard';
-import AdminVentas from '@/pages/admin/AdminVentas';
-import AdminClosers from '@/pages/admin/AdminClosers';
-import AdminMensajes from '@/pages/admin/AdminMensajes';
-import AdminNoticias from '@/pages/admin/AdminNoticias';
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
+const AdminVentas = lazy(() => import('@/pages/admin/AdminVentas'));
+const AdminClosers = lazy(() => import('@/pages/admin/AdminClosers'));
+const AdminMensajes = lazy(() => import('@/pages/admin/AdminMensajes'));
+const AdminNoticias = lazy(() => import('@/pages/admin/AdminNoticias'));
 
 // Closer pages
-import CloserDashboard from '@/pages/closer/CloserDashboard';
-import CloserVentas from '@/pages/closer/CloserVentas';
-import CloserMetricas from '@/pages/closer/CloserMetricas';
-import CloserCalendario from '@/pages/closer/CloserCalendario';
-import CloserMensajes from '@/pages/closer/CloserMensajes';
+const CloserDashboard = lazy(() => import('@/pages/closer/CloserDashboard'));
+const CloserVentas = lazy(() => import('@/pages/closer/CloserVentas'));
+const CloserMetricas = lazy(() => import('@/pages/closer/CloserMetricas'));
+const CloserCalendario = lazy(() => import('@/pages/closer/CloserCalendario'));
+const CloserMensajes = lazy(() => import('@/pages/closer/CloserMensajes'));
 
 // Shared pages
-import Stock from '@/pages/Stock';
-import Canjes from '@/pages/Canjes';
-import Facturas from '@/pages/Facturas';
-import Postventa from '@/pages/Postventa';
-import Casos from '@/pages/Casos';
-import Bonos from '@/pages/Bonos';
-import Leads from '@/pages/Leads';
-import Catalogo from '@/pages/Catalogo';
-import Cuotero from '@/pages/Cuotero';
-import FacturaView from '@/pages/FacturaView';
-import Atencion from '@/pages/Atencion';
+const Stock = lazy(() => import('@/pages/Stock'));
+const Canjes = lazy(() => import('@/pages/Canjes'));
+const Facturas = lazy(() => import('@/pages/Facturas'));
+const Postventa = lazy(() => import('@/pages/Postventa'));
+const Casos = lazy(() => import('@/pages/Casos'));
+const Bonos = lazy(() => import('@/pages/Bonos'));
+const Leads = lazy(() => import('@/pages/Leads'));
+const Catalogo = lazy(() => import('@/pages/Catalogo'));
+const Cuotero = lazy(() => import('@/pages/Cuotero'));
+const FacturaView = lazy(() => import('@/pages/FacturaView'));
+const Atencion = lazy(() => import('@/pages/Atencion'));
 
 function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
   const { user, loading } = useAuth();
@@ -44,6 +45,7 @@ function AppRoutes() {
   const isAdminOrOficina = user?.rol === 'admin' || user?.rol === 'oficina';
 
   return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen bg-[#0a0a0f] text-cyan-400">Cargando…</div>}>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/factura/:id" element={<FacturaView />} />
@@ -75,6 +77,7 @@ function AppRoutes() {
         <Route path="/atencion" element={<Atencion />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }
 

@@ -1,6 +1,6 @@
 // Entorno de demostración aislado. Nunca usa la base real ni envía mensajes externos.
 const path=require('node:path'),fs=require('node:fs'),crypto=require('node:crypto');
-const root=path.resolve(__dirname,'..');const dir=path.join(root,'.demo');fs.mkdirSync(dir,{recursive:true});
+const root=path.resolve(__dirname,'..');const dir=path.resolve(process.env.DEMO_DIR||path.join(root,'.demo'));fs.mkdirSync(dir,{recursive:true});
 process.env.TURSO_DATABASE_URL=`file:${path.join(dir,'demo.db')}`;
 process.env.RESTIC_REPOSITORY='';process.env.ALLOW_MEDIA_DOWNLOADS='false';process.env.MEDIA_DIR=path.join(dir,'media');process.env.PERSISTENT_STORAGE='false';
 process.env.AUTO_AI_PROVIDER='demo';process.env.ALLOW_LIVE_MESSAGES='false';process.env.DEMO_SEED='false';
@@ -26,7 +26,7 @@ async function main(){
   }
   fs.writeFileSync(path.join(dir,'access.json'),JSON.stringify({email:'admin@demo.local',password}),{mode:0o600});
   fs.writeFileSync(path.join(dir,'acceso.txt'),`Demostración local de iPhone Culture\nUsuario: admin@demo.local\nContraseña: ${password}\nURL: http://127.0.0.1:${process.env.PORT}/atencion\n`,{mode:0o600});
-  console.log(`Demostración disponible en http://127.0.0.1:${process.env.PORT}/atencion. Datos de acceso locales: .demo/acceso.txt`);
+  console.log(`Demostración disponible en http://127.0.0.1:${process.env.PORT}/atencion. Datos de acceso guardados en la carpeta privada de demostración.`);
   require('../server/dist/index');
 }
 main().catch(()=>{console.error('No se pudo iniciar la demostración');process.exit(1);});

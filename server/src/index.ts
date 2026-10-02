@@ -15,6 +15,7 @@ import path from 'path';
 import fs from 'fs';
 import { initDb, db } from './db';
 import { authRequired } from './auth';
+import {securityHeaders} from './security';
 
 import authRoutes from './routes/auth';
 import catalogoRoutes from './routes/catalogo';
@@ -34,7 +35,9 @@ import chatRoutes from './routes/chat';
 import mejorasRoutes, { logActividad } from './routes/mejoras';
 
 const app = express();
+if(process.env.NODE_ENV==='production')app.set('trust proxy',1);
 app.use(compression());
+app.use(securityHeaders);
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : false }));
 app.use(express.json({ limit: '10mb', verify: (req, _res, buf) => { if(req.url?.startsWith('/api/integrations/meta')) (req as any).rawBody = Buffer.from(buf); } }));
 app.use('/api/integrations/meta', metaRouter);
