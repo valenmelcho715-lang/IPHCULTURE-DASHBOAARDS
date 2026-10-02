@@ -3,7 +3,7 @@ import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import {
   LayoutDashboard, Users, ShoppingCart, Package, CalendarDays,
-  Repeat, FileText, Wrench, AlertTriangle, Gift, Target, BookOpen,
+  Repeat, FileText, Gift, Target, BookOpen,
   LogOut, ChevronLeft, ChevronRight, Smartphone, BarChart3, Mail,
   Newspaper, MessageSquare, Calculator, Bot
 } from 'lucide-react';
@@ -59,8 +59,6 @@ export default function DashboardLayout() {
   const menuItems = isAdmin ? adminMenu : isOficina ? oficinaMenu : closerMenu;
 
   const rolLabel = isAdmin ? 'Admin' : isOficina ? 'Oficina' : 'Closer';
-  const rolColor = isAdmin ? 'amber' : isOficina ? 'violet' : 'cyan';
-
   return (
     <div className="flex h-screen bg-[#0a0a0f] text-white overflow-hidden">
       <aside className={`flex flex-col border-r border-cyan-500/20 bg-[#0d0d14] transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}

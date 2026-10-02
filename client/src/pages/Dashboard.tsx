@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiGet } from '@/lib/api';
 import {
-  LayoutDashboard, Users, ShoppingCart, Package, CalendarDays,
+  Users, ShoppingCart, Package, CalendarDays,
   Target, DollarSign, TrendingUp, Award, Repeat, FileText, Wrench, AlertTriangle, Gift, BookOpen
 } from 'lucide-react';
 

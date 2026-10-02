@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Send, Newspaper, Trash2, AlertTriangle, Package, Info } from 'lucide-react';
+import { Newspaper, Trash2, AlertTriangle, Package, Info } from 'lucide-react';
 
 export default function AdminNoticias() {
   const [noticias, setNoticias] = useState<any[]>([]);

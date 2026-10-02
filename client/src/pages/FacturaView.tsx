@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import {
-  Smartphone, Printer, Download, Share2, Instagram, Phone,
+  Smartphone, Printer, Share2, Instagram, Phone,
   CheckCircle, Clock, AlertCircle, MessageCircle, FileDown,
-  MapPin, Mail, ShieldCheck, User, Calendar, Hash, Receipt,
-  QrCode, ArrowRight, CreditCard, Banknote, Package
+  MapPin, ShieldCheck, User, Calendar, Hash, Receipt,
+  CreditCard, Package
 } from 'lucide-react';
 
 export default function FacturaView() {
@@ -388,10 +388,6 @@ export default function FacturaView() {
   const fecha = new Date(factura.created_at || factura.fecha).toLocaleDateString('es-AR', {
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
-
-  const estadoColor = pagadoCompleto ? 'emerald' : factura.falta_pagar > 0 ? 'red' : 'amber';
-  const estadoIcon = pagadoCompleto ? CheckCircle : factura.falta_pagar > 0 ? AlertCircle : Clock;
-  const estadoText = pagadoCompleto ? 'Pago completo' : factura.falta_pagar > 0 ? `Falta pagar $${factura.falta_pagar}` : `Sena $${factura.monto_senado}`;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] py-6 px-4 print:bg-white print:py-0">

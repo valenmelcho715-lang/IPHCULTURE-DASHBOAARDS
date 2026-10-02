@@ -1,14 +1,8 @@
 import { useEffect, useState } from 'react';
-import { apiGet, apiPost, apiDelete } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { apiGet } from '@/lib/api';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  LayoutDashboard, Users, DollarSign, ShoppingCart, Target,
-  Plus, Trash2, MessageSquare, Newspaper, Award
+  Users, DollarSign, ShoppingCart, Target,
+  MessageSquare, Newspaper, Award
 } from 'lucide-react';
 
 export default function AdminDashboard() {

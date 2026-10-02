@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { apiGet } from '@/lib/api';
 import {
-  DollarSign, TrendingUp, Award, ShoppingCart, CalendarDays,
-  Target, BarChart3, ArrowUpRight, ArrowDownRight
+  DollarSign, TrendingUp, Award, ShoppingCart,
+  BarChart3, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 
 export default function CloserMetricas() {

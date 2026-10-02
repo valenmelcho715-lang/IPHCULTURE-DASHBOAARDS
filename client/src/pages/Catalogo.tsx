@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiGet } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Smartphone, Copy, Check, Star, Search, X, CreditCard, Tag, Calculator } from 'lucide-react';
+import { Smartphone, Check, Star, Search, X, CreditCard, Tag, Calculator } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Catalogo() {

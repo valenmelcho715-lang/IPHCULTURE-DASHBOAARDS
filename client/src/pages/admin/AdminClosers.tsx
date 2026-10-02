@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { apiGet } from '@/lib/api';
-import { Users, ShoppingCart, Award, DollarSign } from 'lucide-react';
 
 export default function AdminClosers() {
   const [closers, setClosers] = useState<any[]>([]);

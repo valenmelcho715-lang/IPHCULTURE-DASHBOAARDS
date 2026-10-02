@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
-import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +12,6 @@ import {
 import { Pencil, Trash2, Plus, Search, X, FileText, Info, Upload, FileDown } from 'lucide-react';
 
 export default function CloserVentas() {
-  const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);

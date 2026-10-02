@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { CreditCard, Copy, Check, Calculator, DollarSign, ArrowRightLeft, Receipt, Wallet, Percent } from 'lucide-react';
+import { CreditCard, Copy, Check, Calculator, DollarSign, ArrowRightLeft, Receipt, Percent } from 'lucide-react';
 
 interface FeePlan {
   plan: string;

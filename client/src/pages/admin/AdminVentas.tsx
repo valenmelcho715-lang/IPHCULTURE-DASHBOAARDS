@@ -8,7 +8,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Pencil, Trash2, Search, X, TrendingUp, Award, DollarSign, FileDown } from 'lucide-react';
+import { Trash2, Search, X, TrendingUp, DollarSign, FileDown } from 'lucide-react';
 
 export default function AdminVentas() {
   const [items, setItems] = useState<any[]>([]);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiGet, apiPut } from '@/lib/api';
-import { Mail, Check, Bell } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 export default function CloserMensajes() {
   const [mensajes, setMensajes] = useState<any[]>([]);
