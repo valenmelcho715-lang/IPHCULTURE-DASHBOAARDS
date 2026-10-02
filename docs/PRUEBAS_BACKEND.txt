@@ -1,0 +1,73 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> iphone-culture-dashboard@1.0.0 test
+> npm run build -w server && node --test tests/automation.test.cjs
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> server@1.0.0 build
+> tsc
+
+✔ La base vacía no incorpora productos o credenciales de ejemplo (35.270333ms)
+✔ Cuotas reproducen el PDF comercial y la cotización indicada por el dueño (0.792192ms)
+✔ Beneficios: 20 general, 30 recompra, 50 solo cuando se configura acumulación (0.300332ms)
+✔ Canje exige batería y revisión de estado; respeta la deducción Android vigente (0.588245ms)
+✔ El puntaje usa datos de compra y no castiga la demora al responder (0.404969ms)
+✔ No entrega costos a closers ni oficina aunque soliciten la API directamente (40.833442ms)
+✔ Un rol antiguo en el token no otorga permisos de administrador (11.561003ms)
+✔ Solo administración puede registrar dinero ingresado en ventas existentes (15.897787ms)
+✔ Webhook duplicado no crea otro mensaje, lead ni asignación (3.984615ms)
+✔ 500 contactos se distribuyen con una diferencia máxima de una conversación (786.907959ms)
+✔ Respuesta automática cotiza desde Stock y deja trazabilidad (20.926473ms)
+✔ Mensajes consecutivos cancelan el trabajo obsoleto y no duplican respuesta (10.680959ms)
+✔ El pago informado por el cliente deriva a una persona y no confirma dinero (4.616726ms)
+✔ La baja frena todas las respuestas y el seguimiento (4.55327ms)
+✔ Un closer no puede ver ni contestar chats asignados a otra persona (65.490848ms)
+✔ Un comprobante adjunto se deriva sin afirmar que fue aprobado (5.744513ms)
+✔ Dos reservas no pueden comprometer dos veces la última unidad (27.281614ms)
+✔ Turnos respetan horario local, 15 minutos y conflictos (12.192193ms)
+✔ La firma de Meta rechaza avisos alterados y canales ajenos (9.246842ms)
+✔ Seguimiento: cinco plantillas distintas, con permiso; nunca se envía una sexta (23.434476ms)
+✔ Una respuesta de entrega incierta queda detenida y no se reenvía sola (8.66069ms)
+✔ La ventana cerrada impide texto libre incluso si lo escribe una persona (5.280315ms)
+✔ Confirmaciones simultáneas: una unidad permite exactamente una reserva (8.16906ms)
+✔ La búsqueda recorre todo el historial y el listado se pagina (27.281033ms)
+✔ Un webhook atrasado se conserva sin reemplazar una consulta más reciente (10.211823ms)
+✔ El turno manual y el automático usan el mismo control de disponibilidad (27.151899ms)
+✔ La ficha de stock valida batería y expone información comercial sin costo (8.701131ms)
+✔ Un corte largo no dispara juntos los seguimientos vencidos (8.61453ms)
+✔ Dos procesadores no envían dos veces el mismo mensaje (19.917725ms)
+✔ La recuperación periódica reanuda interpretación y detiene envíos inciertos (2.870058ms)
+✔ La salida estructurada se valida y las evidencias deben existir en la conversación (5.989231ms)
+✔ Un error de IA deriva al equipo y reserva el consumo incierto (4.986252ms)
+✔ El límite de IA impide llamar al proveedor cuando no alcanza el presupuesto (3.320285ms)
+✔ Tomar el chat mientras interpreta evita la respuesta automática tardía (6.312167ms)
+✔ Una baja semántica identificada por IA también detiene la atención (4.684157ms)
+✔ La primera respuesta ya calcula las cuotas del mensaje recién recibido (6.029872ms)
+✔ La verificación pública del comprobante no expone costo ni ganancia (2.892572ms)
+✔ Los horarios se responden con las reglas del negocio y la dirección no se inventa (8.744957ms)
+✔ Reprocesar el mismo pedido de turno conserva una sola reserva de agenda (6.257875ms)
+✔ Una seña confirmada se resuelve antes de marcar la oportunidad como perdida (4.597948ms)
+✔ Una cancelación simultánea al cierre no puede deshacer una venta cobrada (11.793963ms)
+✔ La cotización distingue iPhone base, Pro, Pro Max, Plus y Mini (0.469126ms)
+✔ No confirma dos reservas ni crea reservas sobre una oportunidad cerrada (17.937206ms)
+✔ Una respuesta manual de prueba pausa la IA y nunca crea un envío externo (7.201294ms)
+✔ El historial conserva la pérdida y no abre una venta por gracias o por garantía (17.760249ms)
+✔ El historial se carga por páginas sin omitir ni duplicar mensajes (15.838959ms)
+✔ Archivar conserva los chats y una nueva respuesta vuelve a la bandeja (11.436455ms)
+✔ La vinculación de identidad es verificada, conserva canales y propaga la baja (28.460853ms)
+✔ Notas y recordatorios persisten; el recordatorio genera un solo aviso interno (20.190636ms)
+✔ La exportación de historial se limita a administración e incluye oportunidades y notas (10.50215ms)
+✔ La memoria de oportunidades anteriores se envía a la IA sin convertirla en datos actuales (7.575112ms)
+✔ Adjuntos privados: se guardan, se verifican y no quedan accesibles a otro closer (15.594421ms)
+✔ La copia incluye base y adjuntos, restaura en carpeta nueva y detecta alteraciones (47.333321ms)
+✔ El respaldo cifrado restaura los datos desde un repositorio Restic independiente (4496.988211ms)
+✔ La sincronización incremental no pierde mensajes cuando llegan más de una página (18.399651ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 55
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6281.187381

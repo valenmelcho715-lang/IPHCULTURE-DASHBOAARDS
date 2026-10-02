@@ -1,33 +1,21 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
 node_modules
 dist
-dist-ssr
-*.local
 *.db
-*.db-shm
-*.db-wal
+*.db-*
 .env
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
 
-# Misc
-iphone-culture.db*
-node-v20.15.1-darwin-arm64/
-migration_data.json
+.env
+.env.*
+!.env.example
+.demo/
+backups/
+*.db
+*.db-wal
+*.db-shm
+artifacts/
+
+private-media/
+data/
+restic-repository/
+restore/

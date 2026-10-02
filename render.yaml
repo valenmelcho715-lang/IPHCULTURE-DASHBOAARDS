@@ -1,18 +1,43 @@
+# Perfil de despliegue propuesto. Aplicarlo crea recursos de pago en la cuenta del dueño.
+# No altera iphoneculture-web: crea un servicio independiente para el sistema interno.
 services:
   - type: web
-    name: iphone-culture-api
-    runtime: node
-    plan: free
-    buildCommand: npm install && npm run build
-    startCommand: npm start
+    name: iphoneculture-atencion
+    runtime: docker
+    plan: 1c-2g
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    numInstances: 1
+    autoDeployTrigger: 'off'
+    disk:
+      name: culture-persistent
+      mountPath: /app/data
+      sizeGB: 30
     envVars:
       - key: NODE_ENV
         value: production
+      - key: HOST
+        value: 0.0.0.0
       - key: PORT
-        value: 3001
+        value: '8080'
       - key: JWT_SECRET
         generateValue: true
       - key: TURSO_DATABASE_URL
-        sync: false
-      - key: TURSO_AUTH_TOKEN
-        sync: false
+        value: file:/app/data/iphone-culture.db
+      - key: MEDIA_DIR
+        value: /app/data/media
+      - key: BACKUP_DIR
+        value: /app/data/backups
+      - key: RESTIC_CACHE_DIR
+        value: /app/data/restic-cache
+      - key: PERSISTENT_STORAGE
+        value: 'true'
+      - key: MEDIA_QUOTA_GB
+        value: '10'
+      - key: BACKUP_INTERVAL_MINUTES
+        value: '60'
+      - key: ALLOW_LIVE_MESSAGES
+        value: 'false'
+      - key: ALLOW_MEDIA_DOWNLOADS
+        value: 'false'
