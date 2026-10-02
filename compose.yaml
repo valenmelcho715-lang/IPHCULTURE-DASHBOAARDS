@@ -1,0 +1,26 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8080
+      TURSO_DATABASE_URL: file:/app/data/iphone-culture.db
+      MEDIA_DIR: /app/media
+      BACKUP_DIR: /app/backups
+      RESTIC_CACHE_DIR: /app/backups/restic-cache
+      PERSISTENT_STORAGE: 'true'
+    ports:
+      - '127.0.0.1:8080:8080'
+    volumes:
+      - culture_database:/app/data
+      - culture_media:/app/media
+      - culture_backups:/app/backups
+    stop_grace_period: 45s
+volumes:
+  culture_database:
+  culture_media:
+  culture_backups:

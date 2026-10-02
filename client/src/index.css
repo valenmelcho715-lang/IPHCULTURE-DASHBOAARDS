@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   Design tokens iPhone Culture — dark neon (SPEC sección 10)
+   Los agentes pueden AÑADIR clases al final, no modificar esto.
+   ============================================================ */
+
+body {
+  @apply bg-base-900 text-slate-200 font-sans antialiased;
+}
+
+/* Guard global: ningún elemento puede forzar scroll horizontal de la página */
+html,
+body,
+#root {
+  overflow-x: clip;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #101018;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e1e2a;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.3);
+}
+
+@layer components {
+  .glass {
+    @apply bg-base-800/80 backdrop-blur border border-cyan-500/20 rounded-2xl;
+  }
+  .glow-text {
+    text-shadow: 0 0 18px rgba(0, 240, 255, 0.45);
+  }
+  .neon-border {
+    @apply border border-cyan-500/20;
+    box-shadow: 0 0 24px rgba(0, 240, 255, 0.08);
+  }
+}

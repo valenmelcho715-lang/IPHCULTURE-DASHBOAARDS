@@ -1,0 +1,59 @@
+{
+  "reviewed_at": "2026-10-02T14:55:02.755871+00:00",
+  "verdict": "Apto para configurar y realizar un piloto controlado de atención por texto. No aprobado todavía para atención autónoma de clientes reales.",
+  "build": {
+    "client": "passed",
+    "server": "passed",
+    "warning": "Bundle principal de 1.24 MB antes de gzip; oportunidad de mejorar carga inicial."
+  },
+  "functional_tests": {
+    "passed": 44,
+    "failed": 0,
+    "external_calls": "Bloqueadas; Meta y OpenAI simulados con mocks"
+  },
+  "browser": {
+    "date": "2026-10-02T14:52:35.045Z",
+    "environment": "Demo local aislada; sin proveedores externos",
+    "checks": [
+      "Ingreso y panel general",
+      "Borradores separados por conversación",
+      "Respuesta del vendedor y pausa de la IA",
+      "Devolución del chat a la IA",
+      "Panel de resultados",
+      "Configuración visible para administración",
+      "Bandeja móvil sin desborde horizontal",
+      "Ingreso del closer sin controles administrativos",
+      "Sin errores JavaScript en los recorridos"
+    ],
+    "errors": []
+  },
+  "fixed": [
+    "Borradores independientes para evitar texto de un cliente en otro chat.",
+    "No mostrar el detalle anterior durante cambio de conversación o pérdida de acceso.",
+    "Reiniciar selección de stock y descuento al cambiar de chat.",
+    "Distinguir iPhone base, Pro, Pro Max, Plus y Mini al buscar disponibilidad.",
+    "Impedir dos reservas confirmadas simultáneas para la misma conversación.",
+    "Impedir nuevas reservas en oportunidades cerradas.",
+    "Permitir probar respuesta de vendedor, pausa y devolución a IA en simulación.",
+    "Propagar errores de inicio del servidor de pruebas en lugar de esperar indefinidamente."
+  ],
+  "scope": [
+    "Asignación de 500 contactos sintéticos: verifica reparto; no equivale a una prueba de carga de 500 usuarios simultáneos.",
+    "Permisos, cobros, reservas, stock, turnos, cuotas, bajas, seguimiento y fallos de proveedores cubiertos por la suite local.",
+    "Recorridos de interfaz en 1600×1050, 390×844 y sesión de closer en 1366×900.",
+    "No se ejecutó nuevamente migración histórica; la evidencia previa se conserva en VERIFICACION.json.",
+    "No es una auditoría integral de seguridad ni una certificación de funcionamiento de Meta."
+  ],
+  "remaining": [
+    "Configurar alojamiento persistente, dominio HTTPS, secretos y recuperación de copias antes de producción.",
+    "Conectar OpenAI y validar clasificación y respuestas con conversaciones representativas: compras, canjes, objeciones y ambigüedades.",
+    "Conectar cuentas oficiales de Meta y comprobar recepción/envío real, permisos, estados, ventanas y plantillas.",
+    "Fotos/documentos y audios se representan como adjuntos para revisión; la bandeja aún no descarga ni reproduce esos archivos. No prometer atención multimedia íntegra desde la bandeja.",
+    "Comprobar avisos al vendedor en uso real; los avisos internos no equivalen a push móvil de nuevos chats.",
+    "Verificar segundo closer, dirección, condiciones pendientes, stock, cotización y reglas comerciales antes de habilitar respuestas reales."
+  ],
+  "production_deployed": false,
+  "live_meta_tested": false,
+  "live_openai_quality_tested": false,
+  "superseded_by": "VERIFICACION_ALMACENAMIENTO.json"
+}

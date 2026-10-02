@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-02T15:34:23.422Z",
+  "environment": "Demo local aislada; sin proveedores externos",
+  "checks": [
+    "Ingreso y panel general",
+    "Borradores separados por conversación",
+    "Respuesta del vendedor y pausa de la IA",
+    "Devolución del chat a la IA",
+    "Nota comercial visible en ficha",
+    "Retoma programada y visible",
+    "Archivo reversible sin borrar historial",
+    "Nueva oportunidad conserva resultado y motivo anterior",
+    "Historial extenso con carga de páginas anteriores",
+    "Panel de almacenamiento y respaldos",
+    "Panel de resultados",
+    "Configuración visible para administración",
+    "Bandeja móvil sin desborde horizontal",
+    "Ingreso del closer sin controles administrativos",
+    "Sin errores JavaScript en los recorridos"
+  ],
+  "errors": []
+}

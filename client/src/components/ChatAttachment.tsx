@@ -1,0 +1,8 @@
+import {useEffect,useState} from 'react';
+import {getToken} from '../lib/api';
+export function ChatAttachment({file}:{file:any}){
+ const [url,setUrl]=useState(''),[type,setType]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ useEffect(()=>()=>{if(url)URL.revokeObjectURL(url);},[url]);
+ async function open(){setBusy(true);setError('');try{const r=await fetch(`/api/atencion/attachments/${file.id}`,{headers:{Authorization:`Bearer ${getToken()}`}});if(!r.ok)throw new Error('No se pudo abrir el adjunto');const blob=await r.blob();setType(blob.type);setUrl(URL.createObjectURL(blob));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ return <div className="mt-2 border border-slate-600/50 rounded-lg p-2 text-xs"><p>{file.name||'Adjunto'}{file.size_bytes?` · ${Math.ceil(file.size_bytes/1024)} KB`:''}</p>{file.status!=='stored'?<p className="text-amber-300 mt-1">{file.status==='failed'?'No se pudo guardar. Revisar conexión.':file.status==='simulation'?'Adjunto de simulación':'Pendiente de descarga del canal'}</p>:!url?<button type="button" className="text-neon mt-2" onClick={()=>void open()} disabled={busy}>{busy?'Abriendo…':'Abrir adjunto privado'}</button>:<>{type.startsWith('image/')&&<img src={url} alt="Imagen enviada en la conversación" className="max-h-72 rounded mt-2"/>}{type.startsWith('audio/')&&<audio controls src={url} className="w-full max-w-full mt-2"/>}{type.startsWith('video/')&&<video controls src={url} className="max-h-72 w-full mt-2"/>}<a href={url} download={file.name||`adjunto-${file.id}`} className="text-neon block mt-2">Descargar archivo</a></>}{error&&<p role="alert" className="text-red-300 mt-1">{error}</p>}</div>;
+}
