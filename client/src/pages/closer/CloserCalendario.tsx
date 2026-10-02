@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiGet, apiPost, apiPut, apiDelete } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,34 +60,27 @@ export default function CloserCalendario() {
   const [vista, setVista] = useState<'calendario' | 'hoy' | '48hs' | 'sinConfirmar' | 'todos'>('calendario');
   const [filtroVendedor, setFiltroVendedor] = useState<string>('todos');
   const [closers, setClosers] = useState<any[]>([]);
+  const alertedTurnos = useRef(new Set<number>());
 
   const isAdmin = user?.rol === 'admin';
 
-  useEffect(() => {
-    loadUser();
-    loadTurnos();
-    const interval = setInterval(() => { loadTurnos(); checkAlertas(); }, 60000);
-    checkAlertas();
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadUser = async () => {
-    const me = await apiGet('/auth/me');
-    if (me) {
-      setUser(me);
-      setUserTelefono(me.telefono || '');
-      if (me.rol === 'admin') loadClosers();
-    }
-  };
-
-  const loadClosers = async () => {
+  const loadClosers = useCallback(async () => {
     try {
       const data = await apiGet('/closers');
       setClosers(Array.isArray(data) ? data : []);
     } catch { /* ignore */ }
-  };
+  }, []);
 
-  const loadTurnos = async () => {
+  const loadUser = useCallback(async () => {
+    const me = await apiGet('/auth/me');
+    if (me) {
+      setUser(me);
+      setUserTelefono(me.telefono || '');
+      if (me.rol === 'admin') void loadClosers();
+    }
+  }, [loadClosers]);
+
+  const loadTurnos = useCallback(async () => {
     const data = await apiGet('/turnos');
     const arr = Array.isArray(data) ? data : [];
     setTurnos(arr);
@@ -105,19 +98,26 @@ export default function CloserCalendario() {
     });
     setAlertasUrgentes(urg);
     setAlertas(norm);
-  };
+  }, []);
+
+  useEffect(() => {
+    void loadUser();void loadTurnos();
+    const interval = setInterval(() => { void loadTurnos(); }, 60000);
+    return () => clearInterval(interval);
+  }, [loadUser, loadTurnos]);
+
+  useEffect(() => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    for (const turno of alertasUrgentes) {
+      const id=Number(turno.id);if(!Number.isInteger(id)||alertedTurnos.current.has(id))continue;
+      alertedTurnos.current.add(id);
+      new Notification('TURNO EN 15 MIN', { body: `${turno.cliente_nombre} - ${turno.motivo}` });
+    }
+  }, [alertasUrgentes]);
 
   const saveTelefono = async () => {
     await apiPut('/auth/me/telefono', { telefono: userTelefono });
     setEditTelefono(false);
-  };
-
-  const checkAlertas = () => {
-    if (alertasUrgentes.length > 0 && 'Notification' in window && Notification.permission === 'granted') {
-      alertasUrgentes.forEach(t => {
-        new Notification('TURNO EN 15 MIN', { body: `${t.cliente_nombre} - ${t.motivo}` });
-      });
-    }
   };
 
   const openNew = () => {

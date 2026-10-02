@@ -1,6 +1,6 @@
 import {ChatAttachment} from '../components/ChatAttachment';
 import {useCallback,useEffect,useRef,useState} from 'react';
-import {Bot,MessageCircle,Send,Search,UserRound,ArrowRight,CheckCircle2,AlertCircle,FlaskConical,Settings2,BarChart3,RefreshCw,ShieldCheck,Clock,Package,Activity} from 'lucide-react';
+import {Bot,MessageCircle,Send,Search,ArrowRight,CheckCircle2,AlertCircle,FlaskConical,Settings2,BarChart3,RefreshCw,ShieldCheck,Clock,Package,Activity} from 'lucide-react';
 import {useAuth} from '../context/AuthContext';
 import {api,fmtUSD,fmtFecha,getToken} from '../lib/atencionApi';
 import {Button,Input,Select,Textarea,Card,Badge,Modal,Label} from '../components/atencion-ui';
@@ -54,7 +54,8 @@ export default function Atencion(){
   useEffect(()=>{void load().catch(e=>setError(e.message));const t=setInterval(()=>{if(!document.hidden)void load().catch(()=>{});},6000);return()=>clearInterval(t);},[load]);
   useEffect(()=>{void Promise.all([api.get<any[]>('/api/atencion/team'),api.get<any[]>('/api/atencion/stock')]).then(([t,s])=>{setTeam(t);setStock(s);}).catch(e=>setError(e.message));if(admin)void api.get<any[]>('/api/clientes').then(setCustomers).catch(()=>{});},[admin]);
   useEffect(()=>{setDetail(null);if(selected==null)return;void loadDetail(selected).catch(e=>setError(e.message));const t=setInterval(()=>{if(!document.hidden)void loadDetail(selected).catch(()=>{});},3000);return()=>clearInterval(t);},[selected,loadDetail]);
-  useEffect(()=>{bottom.current?.scrollIntoView({behavior:'smooth',block:'nearest'});},[selected,detail?.messages?.at(-1)?.id]);
+  const lastMessageId=detail?.messages?.at(-1)?.id;
+  useEffect(()=>{bottom.current?.scrollIntoView({behavior:'smooth',block:'nearest'});},[selected,lastMessageId]);
   const action=async(fn:()=>Promise<any>,success='Guardado')=>{setBusy(true);setError('');try{await fn();setNotice(success);await load();if(selectedRef.current)await loadDetail(selectedRef.current);setModal(null);}catch(e){setError((e as Error).message);}finally{setBusy(false);}};
   const c=detail?.conversation?.id===selected?detail.conversation:null;const q=c?.qualification||{};
   useEffect(()=>{setStockId('');setDiscount(false);setModal(null);setNotice('');setTestAsSeller(false);},[selected]);
