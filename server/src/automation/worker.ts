@@ -6,7 +6,7 @@ import {conversation,enqueueReply,nowIso,transfer} from './repository';
 import {settings,event,notifyTeam} from './schema';
 import {windowOpen} from './domain';
 import {sendMeta,DeliveryError} from './meta';
-const workerId=crypto.randomUUID();let running=false;let lastMaintenance=0;
+const workerId=crypto.randomUUID();let running=false;let lastMaintenance=0;let timer:NodeJS.Timeout|null=null;
 
 export async function deliver(candidate:any){
   const s=await settings();const tx=await db.transaction('write');
@@ -142,5 +142,12 @@ export async function startWorker(){
   await db.execute('CREATE TABLE IF NOT EXISTS crm_worker_lock(id INTEGER PRIMARY KEY,owner TEXT,expires_at TEXT)');
   await db.execute("INSERT INTO crm_worker_lock(id,owner,expires_at) VALUES(1,'','') ON CONFLICT(id) DO NOTHING");
   await recoverStalled();
-  const timer=setInterval(()=>void tick().catch(()=>console.error('[atencion] error del procesador; revisar diagnóstico')),1000);timer.unref();return timer;
+  if(!timer){timer=setInterval(()=>void tick().catch(()=>console.error('[atencion] error del procesador; revisar diagnóstico')),1000);timer.unref();}
+  return timer;
+}
+export async function stopWorker(timeoutMs=30000){
+  if(timer){clearInterval(timer);timer=null;}
+  const deadline=Date.now()+timeoutMs;
+  while(running&&Date.now()<deadline)await new Promise(resolve=>setTimeout(resolve,50));
+  if(running)throw new Error('El procesador no terminó dentro del plazo de apagado');
 }
