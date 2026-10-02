@@ -37,6 +37,8 @@ before(async()=>{
   }
   const stock=await db.execute({sql:'INSERT INTO stock(producto,modelo,capacidad,color,condicion,precio_costo_usd,precio_venta_usd,cantidad,categoria,battery_pct,warranty_months) VALUES(?,?,?,?,?,?,?,?,?,?,?)',args:['iPhone','iPhone 13','128GB','Negro','Seminuevo',400,600,1,'iPhone',91,3]});stockId=Number(stock.lastInsertRowid);
   const app=express();app.use(express.json({verify:(req,res,b)=>{req.rawBody=Buffer.from(b);}}));
+  app.use(require('../server/dist/security').securityHeaders);
+  app.use('/api/auth',require('../server/dist/routes/auth').default);
   app.use('/api/integrations/meta',metaRouter);
   app.use('/api/atencion',require('../server/dist/automation/routes').automationRouter);
   app.use('/api/stock',require('../server/dist/routes/stock').default);
@@ -50,6 +52,17 @@ after(async()=>{global.fetch=offlineFetch;await new Promise(resolve=>server.clos
 test('La base vacía no incorpora productos o credenciales de ejemplo',async()=>{
   assert.equal(Number((await db.execute('SELECT COUNT(*) AS n FROM catalogo')).rows[0].n),0);
   assert.equal(Number((await db.execute('SELECT COUNT(*) AS n FROM users')).rows[0].n),4);
+});
+test('El navegador recibe protección y el login frena intentos repetidos',async()=>{
+  let response=await realFetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'ataque@example.test',password:'incorrecta'})});
+  assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+  assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+  assert.equal(response.headers.get('cache-control'),'no-store');
+  assert.equal(response.status,401);
+  for(let i=1;i<10;i++)response=await realFetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'ataque@example.test',password:'incorrecta'})});
+  assert.equal(response.status,401);
+  response=await realFetch(base+'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'ataque@example.test',password:'incorrecta'})});
+  assert.equal(response.status,429);assert.ok(Number(response.headers.get('retry-after'))>0);
 });
 test('Cuotas reproducen el PDF comercial y la cotización indicada por el dueño',async()=>{
   const fees=(await db.execute('SELECT * FROM cuotas_fees WHERE cuotas=12')).rows[0];

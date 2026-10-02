@@ -6,6 +6,7 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { db } from '../db';
 import { authRequired, signToken, AuthRequest } from '../auth';
+import {loginRateLimit} from '../security';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ function publicUser(u: UserRow) {
 }
 
 // POST /api/auth/login
-router.post('/login', async (req, res: Response) => {
+router.post('/login', loginRateLimit, async (req, res: Response) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) {

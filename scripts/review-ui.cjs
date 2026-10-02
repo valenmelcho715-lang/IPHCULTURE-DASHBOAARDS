@@ -1,7 +1,7 @@
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const project=path.resolve(__dirname,'..'),base='http://127.0.0.1:8183';
-const server=spawn(process.execPath,['scripts/demo.cjs'],{cwd:project,env:{...process.env,DEMO_PORT:'8183'},stdio:['ignore','pipe','pipe']});
+const project=path.resolve(__dirname,'..'),base='http://127.0.0.1:8183',demoDir=fs.mkdtempSync(path.join(os.tmpdir(),'iphone-culture-ui-'));
+const server=spawn(process.execPath,['scripts/demo.cjs'],{cwd:project,env:{...process.env,DEMO_PORT:'8183',DEMO_DIR:demoDir},stdio:['ignore','pipe','pipe']});
 let started=false;const checks=[],errors=[];const timer=setTimeout(()=>{server.kill();process.exit(1);},25000);
 server.stderr.on('data',x=>process.stderr.write(x));
 server.stdout.on('data',async data=>{
@@ -10,7 +10,7 @@ server.stdout.on('data',async data=>{
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});
   const page=await browser.newPage({viewport:{width:1600,height:1050}});page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*',r=>r.request().url().startsWith(base+'/')||r.request().url().startsWith('data:')?r.continue():r.abort());
-  const access=JSON.parse(fs.readFileSync(path.join(project,'.demo/access.json'),'utf8'));
+  const access=JSON.parse(fs.readFileSync(path.join(demoDir,'access.json'),'utf8'));
   await page.goto(base+'/login');await page.locator('input[type=email]').fill(access.email);await page.locator('input[type=password]').fill(access.password);await page.getByRole('button',{name:/ingresar|iniciar sesión/i}).click();await page.waitForURL(base+'/');checks.push('Ingreso y panel general');
   await page.goto(base+'/atencion');await page.getByText('Ver conversaciones de prueba',{exact:true}).click();
   await page.getByRole('button',{name:/Consulta de compra/}).click();await page.getByText('Intención de compra',{exact:true}).waitFor();
@@ -24,7 +24,7 @@ server.stdout.on('data',async data=>{
   await page.getByRole('button',{name:'Programar retoma',exact:true}).click();await page.locator('input[type="datetime-local"]').fill(new Date(Date.now()+86400000).toISOString().slice(0,16));await page.locator('textarea').last().fill('Revisar disponibilidad del modelo elegido');await page.getByRole('button',{name:'Guardar recordatorio',exact:true}).click();await page.getByRole('button',{name:'Marcar revisión realizada',exact:true}).waitFor();checks.push('Retoma programada y visible');
   await page.getByRole('button',{name:'Archivar',exact:true}).click();await page.getByRole('button',{name:'Desarchivar',exact:true}).waitFor();await page.getByRole('button',{name:'Desarchivar',exact:true}).click();await page.getByRole('button',{name:'Archivar',exact:true}).waitFor();checks.push('Archivo reversible sin borrar historial');
   await page.getByRole('button',{name:'Registrar pérdida',exact:true}).click();await page.locator('textarea').last().fill('Cuotas elevadas · prueba de memoria');await page.getByRole('button',{name:'Guardar motivo y cerrar',exact:true}).click();await page.getByRole('button',{name:'Nueva oportunidad',exact:true}).click();await page.locator('textarea').last().fill('Volvió para consultar otro modelo');await page.getByRole('button',{name:'Abrir oportunidad conservando el historial',exact:true}).click();await page.getByText('Motivo: Cuotas elevadas · prueba de memoria',{exact:true}).first().waitFor();checks.push('Nueva oportunidad conserva resultado y motivo anterior');
-  const sample=await page.evaluate(async()=>{const headers={'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('ic_token')};const first=await fetch('/api/atencion/simulate',{method:'POST',headers,body:JSON.stringify({name:'Historial extenso UI',text:'Necesito garantía',channel:'whatsapp'})}).then(r=>r.json());for(let i=0;i<55;i++)await fetch('/api/atencion/simulate',{method:'POST',headers,body:JSON.stringify({conversationId:first.id,channel:'whatsapp',text:'Detalle histórico '+i})});return first.id;});
+  const sample=await page.evaluate(async()=>{const headers={'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('token')};const first=await fetch('/api/atencion/simulate',{method:'POST',headers,body:JSON.stringify({name:'Historial extenso UI',text:'Necesito garantía',channel:'whatsapp'})}).then(r=>r.json());for(let i=0;i<55;i++)await fetch('/api/atencion/simulate',{method:'POST',headers,body:JSON.stringify({conversationId:first.id,channel:'whatsapp',text:'Detalle histórico '+i})});return first.id;});
   await page.getByRole('button',{name:'Actualizar',exact:true}).click();await page.getByRole('button',{name:new RegExp('Historial extenso UI')}).first().click();await page.getByRole('button',{name:'Cargar mensajes anteriores',exact:true}).click();await page.getByText('Detalle histórico 0',{exact:true}).waitFor();checks.push('Historial extenso con carga de páginas anteriores');
   await page.getByRole('button',{name:/Consulta de compra/}).click();
   await page.getByRole('button',{name:'Datos y copias',exact:true}).click();await page.getByRole('heading',{name:'Historial y almacenamiento',exact:true}).waitFor();await page.getByRole('button',{name:'Crear copia ahora',exact:true}).waitFor();checks.push('Panel de almacenamiento y respaldos');
@@ -38,4 +38,4 @@ server.stdout.on('data',async data=>{
   fs.writeFileSync(path.join(project,'docs/REVISION_UI.json'),JSON.stringify({date:new Date().toISOString(),environment:'Demo local aislada; sin proveedores externos',checks,errors},null,2));console.log(JSON.stringify({checks,errors}));
  }catch(e){console.error(e.stack);process.exitCode=1;}finally{if(browser)await browser.close();server.kill();}
 });
-server.on('exit',()=>{if(!started){clearTimeout(timer);process.exitCode=1;}});
+server.on('exit',()=>{fs.rmSync(demoDir,{recursive:true,force:true});if(!started){clearTimeout(timer);process.exitCode=1;}});
