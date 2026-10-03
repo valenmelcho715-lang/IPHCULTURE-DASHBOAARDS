@@ -29,6 +29,8 @@ export function handoffReply(q:Qualification,text:string,kind:string):string {
     return 'Entiendo. Para revisar bien la garantía y el estado del equipo, te paso con una persona de oficina. Te responde por acá.';
   if(q.intent==='payment'||/se[ñn]a|transfer[ií]|comprobante/i.test(text))
     return '¡Gracias por avisar! Administración va a verificar el ingreso antes de confirmar el pago o la reserva. Te responden por acá.';
+  if(/\b(reservar|reserva(?:rlo|rla)?|separar|guardar(?:me)?\s+(?:el|la|un|una)\s+equipo)\b/i.test(text))
+    return 'Perfecto, te paso con una persona del equipo para que te ayude a reservarlo. Te responde por acá.';
   if(q.intent==='complaint'||/denuncia|estafa|reclamo|no funciona|falla|problema/i.test(text))
     return 'Lamento lo que pasó. Dejo tu caso con una persona del equipo para que lo revise y te ayude por acá.';
   if(/hablar con (alguien|una persona|un vendedor)/i.test(text))

@@ -68,6 +68,12 @@ El descuento general máximo confirmado es USD 15. Se descuenta del equipo que c
 
 Los importes se calculan sobre la diferencia vigente después de canje y descuentos. La respuesta muestra únicamente el valor de cada cuota, no el total financiado. Si la persona pide una cantidad concreta, se muestra solo ese plan.
 
+**Solicitud de reserva**
+
+> Perfecto, te paso con una persona del equipo para que te ayude a reservarlo. Te responde por acá.
+
+Reservar, separar o guardar un equipo siempre deriva a atención humana. La IA no genera reservas, solicita señas ni comparte datos de pago por su cuenta.
+
 **Comprobante o transferencia**
 
 > ¡Gracias por avisar! Administración va a verificar el ingreso antes de confirmar el pago o la reserva. Te responden por acá.

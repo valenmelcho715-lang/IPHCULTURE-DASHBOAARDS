@@ -358,6 +358,13 @@ test('La consulta general muestra 1, 3, 6, 9 y 12 cuotas sin informar totales',a
   for(const n of [1,3,6,9,12])assert.match(out,new RegExp(`• ${n} cuota${n===1?'':'s'} de`));
   assert.match(out,/Sí, por supuesto\. Te paso cómo queda/);assert.match(out,/¿Cuál opción te sirve\?/);assert.doesNotMatch(out,/total financiado/i);
 });
+test('Toda solicitud de reserva deriva a una persona sin crearla automáticamente',async()=>{
+  const before=Number((await db.execute('SELECT COUNT(*) AS n FROM crm_reservations')).rows[0].n);
+  const r=await input('Me sirven las 6 cuotas. ¿Cómo hago para reservar el equipo?');await processInput(r);
+  const c=await repo.conversation(r.id);assert.equal(c.mode,'human');assert.match(c.handoff_reason,/Reserva solicitada/);
+  const out=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0].text;
+  assert.match(out,/te paso con una persona del equipo/);assert.equal(Number((await db.execute('SELECT COUNT(*) AS n FROM crm_reservations')).rows[0].n),before);
+});
 test('La verificación pública del comprobante no expone costo ni ganancia',async()=>{
   const invoice=(await db.execute('SELECT numero FROM facturas ORDER BY id DESC LIMIT 1')).rows[0];
   const response=await realFetch(base+'/api/comprobante/'+encodeURIComponent(invoice.numero));assert.equal(response.status,200);

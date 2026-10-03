@@ -46,6 +46,7 @@ export function optedOut(text: string): boolean {
 }
 export function handoffReason(q: Qualification, text: string): string | null {
   if (['payment', 'complaint', 'warranty'].includes(q.intent)) return ({payment:'Confirmación de dinero o seña',complaint:'Reclamo',warranty:'Garantía'} as Record<string,string>)[q.intent];
+  if (/\b(reservar|reserva(?:rlo|rla)?|separar|guardar(?:me)?\s+(?:el|la|un|una)\s+equipo)\b/i.test(text)) return 'Reserva solicitada: requiere atención humana';
   if (/\b(se[ñn]a|transfer[ií]|comprobante|denuncia|estafa|reclamo|garant[ií]a|no funciona|falla|problema|hablar con (alguien|una persona|un vendedor))\b/i.test(text)) return 'Requiere atención de una persona';
   if (q.tradeRepaired === true || q.tradeInternalOk === false) return 'Canje con reparación o falla: revisión de oficina';
   return null;
