@@ -54,7 +54,7 @@ export async function processJob(job:any){
         const available=await stockAvailable();const matches=matchingStock(available,q.product);
         if(!matches.length){const alternatives=available.filter(x=>Number(x.available)>0&&(!q.budgetUsd||Number(x.precio_venta_usd)<=q.budgetUsd)).slice(0,3);const firstContact=history.filter(m=>m.direction==='in').length===1;reply=outOfStockReply(q.product,alternatives,firstContact);if(!alternatives.length)handoff='Sin stock para la consulta';}
         else if(matches.length>1){reply='Para ese modelo tengo estas opciones: '+matches.slice(0,4).map(x=>`${x.modelo} ${x.capacidad||''} ${x.color||''} (${x.condicion||'estado a confirmar'})`).join(' · ')+'. ¿Cuál preferís?';}
-        else{const estimate=await quote(c.id,Number(matches[0].id),q.priceObjection,tradeCredit,q);reply=quoteText(estimate)+(q.timeframe==='later'&&!c.followup_optin?' ¿Me autorizás a escribirte por acá en 48 horas para retomar esta consulta?':q.payment?' ¿Querés que veamos un turno para que lo conozcas?':' ¿Preferís abonar al contado o en cuotas?');}
+        else{const estimate=await quote(c.id,Number(matches[0].id),q.priceObjection,tradeCredit,q);const cardPayment=/tarjeta|cuotas?/i.test(String(q.payment||''));reply=quoteText(estimate)+(q.timeframe==='later'&&!c.followup_optin?' ¿Me autorizás a escribirte por acá en 48 horas para retomar esta consulta?':q.installments?'\n¿Te sirve esa opción?':cardPayment?'\n¿Cuál opción te sirve?':q.payment?' ¿Querés que veamos un turno para que lo conozcas?':' ¿Preferís abonar al contado o en cuotas?');}
       }
     }
   }

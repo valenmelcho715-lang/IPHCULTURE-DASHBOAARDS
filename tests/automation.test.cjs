@@ -340,7 +340,13 @@ test('Una baja semántica identificada por IA también detiene la atención',asy
 test('La primera respuesta ya calcula las cuotas del mensaje recién recibido',async()=>{
   const r=await input('Quiero un iPhone 13 en 12 cuotas');await processInput(r);
   const out=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0];
-  assert.match(out.text,/12 cuotas con interés/);assert.match(out.text,/139\.649,51/);
+  assert.match(out.text,/12 cuotas de/);assert.match(out.text,/139\.649,51/);assert.doesNotMatch(out.text,/total financiado/i);
+});
+test('La consulta general muestra 1, 3, 6, 9 y 12 cuotas sin informar totales',async()=>{
+  const r=await input('Quiero un iPhone 13, ¿puedo pagar en cuotas?');await processInput(r);
+  const out=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0].text;
+  for(const n of [1,3,6,9,12])assert.match(out,new RegExp(`• ${n} cuota${n===1?'':'s'} de`));
+  assert.match(out,/Sí, por supuesto\. Te paso cómo queda/);assert.match(out,/¿Cuál opción te sirve\?/);assert.doesNotMatch(out,/total financiado/i);
 });
 test('La verificación pública del comprobante no expone costo ni ganancia',async()=>{
   const invoice=(await db.execute('SELECT numero FROM facturas ORDER BY id DESC LIMIT 1')).rows[0];
