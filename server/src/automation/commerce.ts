@@ -8,6 +8,7 @@ export const money=(n:number)=>`USD ${n.toLocaleString('es-AR',{maximumFractionD
 export const pesos=(n:number)=>`$ ${n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 export async function stockAvailable(tx:any=db):Promise<any[]> {
   return (await tx.execute({sql:`SELECT s.id,s.producto,s.modelo,s.capacidad,s.color,s.condicion,s.precio_venta_usd,s.battery_pct,s.repairs,s.warranty_months,
+  COALESCE(s.image_url,(SELECT c.imagen_url FROM catalogo c WHERE lower(trim(c.modelo))=lower(trim(s.modelo)) AND c.imagen_url IS NOT NULL AND trim(c.imagen_url)<>'' ORDER BY c.id DESC LIMIT 1)) AS image_url,
   s.cantidad-(SELECT COUNT(*) FROM crm_reservations r JOIN crm_conversations c ON c.id=r.conversation_id WHERE r.stock_id=s.id AND r.status='confirmed' AND r.expires_at>? AND c.sandbox=0) AS available
   FROM stock s WHERE s.cantidad>0 ORDER BY s.precio_venta_usd`,args:[nowIso()]})).rows;
 }

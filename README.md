@@ -119,6 +119,17 @@ La migración se puede repetir sobre una copia temporal con `python3 scripts/che
 
 La calidad de la calificación debe evaluarse con conversaciones reales anonimizadas y con el modelo conectado. La instalación real necesita comprobar permisos de Meta, webhooks, entrega, coexistencia del número, límites de cuenta y recuperación ante cortes. No se afirma que esas verificaciones se hayan completado con las cuentas del negocio.
 
+## Funciones recuperadas del prototipo anterior
+
+Se incorporaron las partes útiles del antiguo proyecto Django sin trasladar su dependencia operativa de Notion ni sus respuestas en inglés:
+
+- **Audios:** pueden transcribirse manualmente desde la conversación. Con `AUTO_TRANSCRIBE_AUDIO=true`, un audio se guarda primero, se transcribe y recién entonces entra a la interpretación comercial. Si falla, se deriva al equipo. El modelo se configura con `OPENAI_TRANSCRIPTION_MODEL`; la función queda apagada por defecto.
+- **Fotos de equipos:** Stock admite una URL HTTPS pública por unidad. También reutiliza una imagen del Catálogo cuando el modelo coincide exactamente. La foto solo se prepara si el cliente pide expresamente una foto o imagen y existe una única coincidencia de stock.
+- **Alertas de alta intención:** si una oportunidad con puntaje alto queda sin respuesta después del último mensaje del equipo, se crea un aviso interno a la hora, a las 12 horas y a las 24 horas. Cada aviso es idempotente y nunca escribe automáticamente al cliente.
+- **Seguridad preservada:** las simulaciones no pueden enviar fotos; los envíos reales siguen requiriendo `ALLOW_LIVE_MESSAGES=true`, la automatización activa y una ventana válida de Meta.
+
+No se trasladó el almacenamiento de clientes y mensajes en Notion ni la integración incompleta de Mercado Pago. El sistema actual ya resuelve mejor los turnos, cuotas, canjes, seguimiento, control humano, idempotencia y trazabilidad.
+
 ## Referencias técnicas
 
 - https://developers.openai.com/api/docs/guides/structured-outputs

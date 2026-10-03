@@ -59,6 +59,21 @@ export async function processMedia(){
     const stored=await storeResponse(response,crypto.randomUUID()+'.bin');
     if(item.expected_sha256&&Buffer.from(stored.sha256,'hex').toString('base64')!==item.expected_sha256&&stored.sha256!==item.expected_sha256){await fs.promises.unlink(path.join(mediaRoot(),stored.key));throw new Error('La integridad del adjunto no coincide');}
     await db.execute({sql:"UPDATE crm_attachments SET status='stored',storage_key=?,size_bytes=?,sha256=?,mime=?,source_url=NULL,error=NULL WHERE id=?",args:[stored.key,stored.size,stored.sha256,mime,item.id]});
+    if(process.env.AUTO_TRANSCRIBE_AUDIO==='true'&&String(mime).startsWith('audio/')){
+      try{
+        const {transcribeAttachment}=await import('./transcription');const transcript=await transcribeAttachment(Number(item.id));
+        await db.batch([
+          {sql:"UPDATE crm_messages SET text=?,kind='text',processable=1 WHERE id=?",args:[transcript,Number(item.message_id)]},
+          {sql:"INSERT INTO crm_jobs(conversation_id,message_id,ready_at) VALUES(?,?,?) ON CONFLICT(message_id) DO NOTHING",args:[Number(item.conversation_id),Number(item.message_id),nowIso()]}
+        ],'write');
+      }catch(e){
+        await db.batch([
+          {sql:"UPDATE crm_attachments SET transcription_status='failed',error=? WHERE id=?",args:[e instanceof Error?e.message:'No se pudo transcribir el audio',Number(item.id)]},
+          {sql:"UPDATE crm_messages SET processable=1 WHERE id=?",args:[Number(item.message_id)]},
+          {sql:"INSERT INTO crm_jobs(conversation_id,message_id,ready_at) VALUES(?,?,?) ON CONFLICT(message_id) DO NOTHING",args:[Number(item.conversation_id),Number(item.message_id),nowIso()]}
+        ],'write');
+      }
+    }
   }catch(e){const message=e instanceof Error?e.message:'Error de almacenamiento';const allowed=/^(Falta|No se pudo|Origen|Adjunto|Espacio|Límite|La integridad|El proveedor|Demasiadas)/.test(message);await db.execute({sql:"UPDATE crm_attachments SET status=?,retry_at=?,error=? WHERE id=?",args:[Number(item.attempts)>=2?'failed':'pending',new Date(Date.now()+60000*2**Number(item.attempts)).toISOString(),allowed?message:'No se pudo almacenar el adjunto; revisar conexión y disco',item.id]});}
 }
 export function attachmentPath(key:string){if(!/^[a-f0-9-]+\.bin$/.test(key))throw new BusinessError('Adjunto inválido');return path.join(mediaRoot(),key);}

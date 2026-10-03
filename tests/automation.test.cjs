@@ -12,9 +12,9 @@ const domain=require('../server/dist/automation/domain');
 const repo=require('../server/dist/automation/repository');
 const commerce=require('../server/dist/automation/commerce');
 const {processJob}=require('../server/dist/automation/engine');
-const {maintenance,deliver,recoverStalled}=require('../server/dist/automation/worker');
+const {maintenance,deliver,recoverStalled,alertSilentHighIntent}=require('../server/dist/automation/worker');
 const intelligence=require('../server/dist/automation/intelligence');
-const {metaRouter,validSignature}=require('../server/dist/automation/meta');
+const {metaRouter,validSignature,sendMeta}=require('../server/dist/automation/meta');
 const {signToken}=require('../server/dist/auth');
 const express=require('express');let server,base,users={},stockId;
 const realFetch=global.fetch;
@@ -96,6 +96,34 @@ test('Respuesta automática cotiza desde Stock y deja trazabilidad',async()=>{
   const c=await repo.conversation(r.id);assert.equal(c.score,75);assert.equal(c.mode,'auto');
   const out=(await db.execute({sql:"SELECT text,delivery FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0];assert.match(out.text,/USD 600/);assert.equal(out.delivery,'preview');
   assert.equal(Number((await db.execute({sql:'SELECT COUNT(*) AS n FROM crm_quotes WHERE conversation_id=?',args:[r.id]})).rows[0].n),1);
+});
+test('Una foto del stock solo se prepara cuando el cliente la pide',async()=>{
+  await db.execute({sql:'UPDATE stock SET image_url=? WHERE id=?',args:['https://cdn.example.test/iphone-13.jpg',stockId]});
+  const requested=await input('Quiero una foto del iPhone 13');await processInput(requested);
+  const out=(await db.execute({sql:"SELECT m.kind,m.text,o.template FROM crm_messages m JOIN crm_outbox o ON o.message_id=m.id WHERE m.conversation_id=? AND m.direction='out' ORDER BY m.id",args:[requested.id]})).rows;
+  assert.equal(out.length,2);assert.equal(out[0].kind,'image');assert.equal(JSON.parse(String(out[0].template)).url,'https://cdn.example.test/iphone-13.jpg');assert.equal(out[1].kind,'text');
+  const notRequested=await input('Quiero un iPhone 13');await processInput(notRequested);
+  const kinds=(await db.execute({sql:"SELECT kind FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[notRequested.id]})).rows.map(x=>x.kind);
+  assert.deepEqual(kinds,['text']);
+});
+test('Meta recibe la foto como imagen y nunca desde una simulación',async()=>{
+  const previous={allow:process.env.ALLOW_LIVE_MESSAGES,version:process.env.META_GRAPH_VERSION,token:process.env.WHATSAPP_ACCESS_TOKEN,phone:process.env.WHATSAPP_PHONE_NUMBER_ID};
+  process.env.ALLOW_LIVE_MESSAGES='true';process.env.META_GRAPH_VERSION='v23.0';process.env.WHATSAPP_ACCESS_TOKEN='test-token';process.env.WHATSAPP_PHONE_NUMBER_ID='123';
+  let payload;global.fetch=async(_url,options)=>{payload=JSON.parse(String(options.body));return new Response(JSON.stringify({messages:[{id:'wamid.test'}]}),{status:200,headers:{'content-type':'application/json'}});};
+  try{await sendMeta({channel:'whatsapp',external_id:'5492990000000',sandbox:0},'Foto','image',{url:'https://cdn.example.test/iphone.jpg'});assert.equal(payload.type,'image');assert.equal(payload.image.link,'https://cdn.example.test/iphone.jpg');await assert.rejects(sendMeta({channel:'whatsapp',external_id:'1',sandbox:1},'Foto','image',{url:'https://cdn.example.test/x.jpg'}),/simulación/);}
+  finally{global.fetch=offlineFetch;for(const [key,value] of Object.entries(previous)){const name={allow:'ALLOW_LIVE_MESSAGES',version:'META_GRAPH_VERSION',token:'WHATSAPP_ACCESS_TOKEN',phone:'WHATSAPP_PHONE_NUMBER_ID'}[key];if(value===undefined)delete process.env[name];else process.env[name]=value;}}
+});
+test('Los audios automáticos esperan transcripción antes de entrar a la IA',async()=>{
+  process.env.AUTO_TRANSCRIBE_AUDIO='true';process.env.ALLOW_MEDIA_DOWNLOADS='true';
+  try{const r=await repo.receive({channel:'whatsapp',externalId:crypto.randomUUID(),providerId:crypto.randomUUID(),name:'Audio de prueba',text:'[audio pendiente]',kind:'audio',attachments:[{providerId:'123456',mime:'audio/ogg'}]});const message=(await db.execute({sql:'SELECT processable FROM crm_messages WHERE id=?',args:[r.messageId]})).rows[0];const jobs=Number((await db.execute({sql:'SELECT COUNT(*) AS n FROM crm_jobs WHERE message_id=?',args:[r.messageId]})).rows[0].n);assert.equal(Number(message.processable),0);assert.equal(jobs,0);}
+  finally{delete process.env.AUTO_TRANSCRIBE_AUDIO;process.env.ALLOW_MEDIA_DOWNLOADS='false';await db.execute("DELETE FROM crm_attachments WHERE provider_ref='123456'");}
+});
+test('Alta intención sin respuesta genera un aviso interno único',async()=>{
+  const r=await input('Quiero un iPhone 13, tengo USD 600, efectivo y compro hoy');await processInput(r);await db.execute({sql:'UPDATE crm_conversations SET sandbox=0 WHERE id=?',args:[r.id]});
+  const outbound=(await db.execute({sql:"SELECT id FROM crm_messages WHERE conversation_id=? AND direction='out' ORDER BY id DESC LIMIT 1",args:[r.id]})).rows[0];
+  const old=new Date(Date.now()-13*3600000).toISOString(),older=new Date(Date.now()-13*3600000-60000).toISOString();await db.batch([{sql:'UPDATE crm_messages SET created_at=? WHERE id=?',args:[old,Number(outbound.id)]},{sql:"UPDATE crm_messages SET created_at=? WHERE conversation_id=? AND direction='in'",args:[older,r.id]},{sql:'UPDATE crm_conversations SET last_outbound=? WHERE id=?',args:[old,r.id]}],'write');
+  assert.equal(await alertSilentHighIntent(),1);assert.equal(await alertSilentHighIntent(),0);
+  assert.equal(Number((await db.execute({sql:"SELECT COUNT(*) AS n FROM crm_actions WHERE conversation_id=? AND kind='silence_alert_12h'",args:[r.id]})).rows[0].n),1);
 });
 test('Mensajes consecutivos cancelan el trabajo obsoleto y no duplican respuesta',async()=>{
   const externalId=crypto.randomUUID();const a=await input('Hola',{externalId});const b=await input('Quiero un iPhone 13 en efectivo',{externalId});await processInput(a);await processInput(b);await processInput(b);

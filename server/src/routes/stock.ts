@@ -10,10 +10,12 @@
 import { Router, Response } from 'express';
 import { db } from '../db';
 import { authRequired, requireRole, AuthRequest } from '../auth';
+import net from 'node:net';
 
 const router = Router();
 function visible(row: any, role: string) { const value={...row}; if(role!=='admin') delete value.precio_costo_usd; return value; }
 async function held(id: number) {const r=await db.execute({sql:"SELECT COUNT(*) AS n FROM crm_reservations r JOIN crm_conversations c ON c.id=r.conversation_id WHERE r.stock_id=? AND r.status='confirmed' AND r.expires_at>? AND c.sandbox=0",args:[id,new Date().toISOString()]});return Number(r.rows[0].n);}
+function imageUrl(value:unknown):string|null {if(value==null||String(value).trim()==='')return null;try{const u=new URL(String(value).trim());if(u.protocol!=='https:'||u.username||u.password||u.port||net.isIP(u.hostname)||u.hostname==='localhost'||!u.hostname.includes('.'))throw new Error();return u.toString();}catch{throw new Error('La foto debe usar una dirección HTTPS pública');}}
 
 
 // ---- GET / (todos los roles autenticados) ----
@@ -41,7 +43,7 @@ router.post('/', authRequired, requireRole('admin', 'oficina'), async (req: Auth
       precio_costo_usd = 0,
       precio_venta_usd = 0,
       cantidad = 0,
-      categoria = null, battery_pct = null, repairs = null, warranty_months = null,
+      categoria = null, battery_pct = null, repairs = null, warranty_months = null, image_url = null,
     } = req.body || {};
 
     if (!producto || !modelo) {
@@ -50,9 +52,10 @@ router.post('/', authRequired, requireRole('admin', 'oficina'), async (req: Auth
     }
 
     if ((battery_pct!=null&&(!Number.isFinite(Number(battery_pct))||Number(battery_pct)<1||Number(battery_pct)>100))||(warranty_months!=null&&(!Number.isInteger(Number(warranty_months))||Number(warranty_months)<0||Number(warranty_months)>60))){res.status(400).json({error:'Batería o garantía inválida'});return;}
+    let photo:string|null;try{photo=imageUrl(image_url);}catch(e){res.status(400).json({error:(e as Error).message});return;}
     const result = await db.execute({
-      sql: `INSERT INTO stock (producto, modelo, capacidad, color, condicion, precio_costo_usd, precio_venta_usd, cantidad, categoria, battery_pct, repairs, warranty_months)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+      sql: `INSERT INTO stock (producto, modelo, capacidad, color, condicion, precio_costo_usd, precio_venta_usd, cantidad, categoria, battery_pct, repairs, warranty_months, image_url)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
         producto,
         modelo,
@@ -62,7 +65,7 @@ router.post('/', authRequired, requireRole('admin', 'oficina'), async (req: Auth
         req.user!.rol==='admin' ? Number(precio_costo_usd)||0 : 0,
         Number(precio_venta_usd) || 0,
         Math.max(0, Math.trunc(Number(cantidad) || 0)),
-        categoria, battery_pct==null?null:Number(battery_pct), repairs==null?null:String(repairs).slice(0,500), warranty_months==null?null:Number(warranty_months),
+        categoria, battery_pct==null?null:Number(battery_pct), repairs==null?null:String(repairs).slice(0,500), warranty_months==null?null:Number(warranty_months), photo,
       ],
     });
 
@@ -95,14 +98,15 @@ router.put('/:id', authRequired, requireRole('admin', 'oficina'), async (req: Au
       precio_costo_usd = prev.precio_costo_usd,
       precio_venta_usd = prev.precio_venta_usd,
       cantidad = prev.cantidad,
-      categoria = prev.categoria, battery_pct = prev.battery_pct, repairs = prev.repairs, warranty_months = prev.warranty_months,
+      categoria = prev.categoria, battery_pct = prev.battery_pct, repairs = prev.repairs, warranty_months = prev.warranty_months, image_url = prev.image_url,
     } = req.body || {};
 
     if ((battery_pct!=null&&(!Number.isFinite(Number(battery_pct))||Number(battery_pct)<1||Number(battery_pct)>100))||(warranty_months!=null&&(!Number.isInteger(Number(warranty_months))||Number(warranty_months)<0||Number(warranty_months)>60))){res.status(400).json({error:'Batería o garantía inválida'});return;}
     if (Number(cantidad) < await held(id)) {res.status(409).json({error:'La cantidad no puede ser menor a las unidades reservadas'});return;}
+    let photo:string|null;try{photo=imageUrl(image_url);}catch(e){res.status(400).json({error:(e as Error).message});return;}
     const saved = await db.execute({
       sql: `UPDATE stock SET producto=?, modelo=?, capacidad=?, color=?, condicion=?,
-            precio_costo_usd=?, precio_venta_usd=?, cantidad=?, categoria=?, battery_pct=?, repairs=?, warranty_months=? WHERE id=? AND ? >= (SELECT COUNT(*) FROM crm_reservations r JOIN crm_conversations c ON c.id=r.conversation_id WHERE r.stock_id=? AND r.status='confirmed' AND r.expires_at>? AND c.sandbox=0)`,
+            precio_costo_usd=?, precio_venta_usd=?, cantidad=?, categoria=?, battery_pct=?, repairs=?, warranty_months=?, image_url=? WHERE id=? AND ? >= (SELECT COUNT(*) FROM crm_reservations r JOIN crm_conversations c ON c.id=r.conversation_id WHERE r.stock_id=? AND r.status='confirmed' AND r.expires_at>? AND c.sandbox=0)`,
       args: [
         producto,
         modelo,
@@ -112,7 +116,7 @@ router.put('/:id', authRequired, requireRole('admin', 'oficina'), async (req: Au
         req.user!.rol==='admin' ? Number(precio_costo_usd)||0 : Number(prev.precio_costo_usd)||0,
         Number(precio_venta_usd) || 0,
         Math.max(0, Math.trunc(Number(cantidad) || 0)),
-        categoria, battery_pct==null?null:Number(battery_pct), repairs==null?null:String(repairs).slice(0,500), warranty_months==null?null:Number(warranty_months),
+        categoria, battery_pct==null?null:Number(battery_pct), repairs==null?null:String(repairs).slice(0,500), warranty_months==null?null:Number(warranty_months), photo,
         id,
         Math.max(0, Math.trunc(Number(cantidad) || 0)), id, new Date().toISOString(),
       ],

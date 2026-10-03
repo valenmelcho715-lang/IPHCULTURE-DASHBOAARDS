@@ -38,7 +38,8 @@ export async function deliver(candidate:any){
   }catch(e){await tx.rollback();throw e;}finally{tx.close();}
   if(block){await event(c.id,'delivery_blocked',block);return;}
   try{
-    const providerId=await sendMeta(c,String(message.text),isTemplate?'template':'text',row.template?JSON.parse(String(row.template)):undefined);
+    const kind=String(row.kind)==='image'?'image':isTemplate?'template':'text';
+    const providerId=await sendMeta(c,String(message.text),kind,row.template?JSON.parse(String(row.template)):undefined);
     const sent=nowIso();
     const updates:any[]=[
       {sql:"UPDATE crm_messages SET provider_id=?,delivery='sent' WHERE id=?",args:[`${c.channel}:0:${providerId}`,Number(row.message_id)]},
@@ -66,8 +67,28 @@ export async function recoverStalled(){
   ],'write');
 }
 
+export async function alertSilentHighIntent(reference=new Date()){
+  const rows=(await db.execute(`SELECT c.id,c.owner_id,
+    (SELECT id FROM crm_messages m WHERE m.conversation_id=c.id AND m.direction='out' AND m.author IN('ai','human') ORDER BY m.id DESC LIMIT 1) AS anchor_id,
+    (SELECT created_at FROM crm_messages m WHERE m.conversation_id=c.id AND m.direction='out' AND m.author IN('ai','human') ORDER BY m.id DESC LIMIT 1) AS anchor_at,
+    (SELECT MAX(created_at) FROM crm_messages m WHERE m.conversation_id=c.id AND m.direction='in' AND m.processable=1) AS latest_inbound
+    FROM crm_conversations c JOIN crm_contacts p ON p.id=c.contact_id
+    WHERE c.sandbox=0 AND c.status='active' AND c.score>=65 AND c.archived_at IS NULL AND p.opt_out=0`)).rows;
+  let created=0;
+  for(const row of rows){
+    if(!row.anchor_id||!row.anchor_at||String(row.latest_inbound||'')>String(row.anchor_at))continue;
+    const hours=(reference.getTime()-Date.parse(String(row.anchor_at)))/3600000;
+    const threshold=hours>=24?24:hours>=12?12:hours>=1?1:0;if(!threshold)continue;
+    const kind=`silence_alert_${threshold}h`,detail=`Alta intención sin respuesta del cliente desde hace ${threshold} hora${threshold===1?'':'s'}`;
+    const inserted=await db.execute({sql:'INSERT INTO crm_actions(conversation_id,cause_message_id,kind,result,created_at) VALUES(?,?,?,?,?) ON CONFLICT(conversation_id,cause_message_id,kind) DO NOTHING',args:[Number(row.id),Number(row.anchor_id),kind,detail,nowIso()]});
+    if(inserted.rowsAffected){created++;await event(Number(row.id),kind,detail);await notifyTeam(Number(row.id),detail,Number(row.owner_id)||null,!row.owner_id);}
+  }
+  return created;
+}
+
 export async function maintenance(){
   await recoverStalled();
+  await alertSilentHighIntent();
   const expired=await db.execute({sql:"SELECT id,conversation_id FROM crm_reservations WHERE status='confirmed' AND expires_at<=?",args:[nowIso()]});
   for(const r of expired.rows){await db.execute({sql:"UPDATE crm_reservations SET status='expired' WHERE id=? AND status='confirmed'",args:[Number(r.id)]});await event(Number(r.conversation_id),'reservation_expired',`La reserva #${r.id} venció y liberó disponibilidad. Revisar la seña con el cliente.`);}
   const due=(await db.execute({sql:"SELECT c.id,c.owner_id,c.next_action_note FROM crm_conversations c JOIN crm_contacts p ON p.id=c.contact_id WHERE c.next_action_at<=? AND c.next_action_notified IS NULL AND c.archived_at IS NULL AND p.opt_out=0",args:[nowIso()]})).rows;

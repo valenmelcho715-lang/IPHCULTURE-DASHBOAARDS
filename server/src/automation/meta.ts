@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
+import net from 'node:net';
 import {Router} from 'express';
 import {db} from '../db';
 import {receive,BusinessError} from './repository';
+import {transcriptionStatus} from './transcription';
 export function validSignature(raw:Buffer,signature:string|undefined,secret:string):boolean {
   if(!secret||!signature||!/^sha256=[a-f0-9]{64}$/.test(signature))return false;
   const expected=crypto.createHmac('sha256',secret).update(raw).digest();
@@ -12,7 +14,7 @@ export function connectionStatus(){return {
   whatsapp:!!(process.env.WHATSAPP_ACCESS_TOKEN&&process.env.WHATSAPP_PHONE_NUMBER_ID&&process.env.META_APP_SECRET&&process.env.META_VERIFY_TOKEN&&process.env.META_GRAPH_VERSION),
   instagram:!!(process.env.INSTAGRAM_ACCESS_TOKEN&&process.env.INSTAGRAM_ACCOUNT_ID&&process.env.META_APP_SECRET&&process.env.META_VERIFY_TOKEN&&process.env.META_GRAPH_VERSION),
   liveDelivery:process.env.ALLOW_LIVE_MESSAGES==='true',
-  model:process.env.OPENAI_MODEL||'gpt-4.1-mini',demo:process.env.AUTO_AI_PROVIDER==='demo',
+  model:process.env.OPENAI_MODEL||'gpt-4.1-mini',demo:process.env.AUTO_AI_PROVIDER==='demo',transcription:transcriptionStatus(),
 };}
 export const metaRouter=Router();
 async function configuredWhatsAppPhoneId():Promise<string|undefined>{
@@ -70,23 +72,24 @@ metaRouter.post('/',async(req,res)=>{
   }catch{res.sendStatus(503);}
 });
 export class DeliveryError extends Error {constructor(message:string,public retryable=false,public uncertain=false){super(message);}}
-export async function sendMeta(c:any,text:string,kind:string,template?:{name:string;language:string}){
+export async function sendMeta(c:any,text:string,kind:string,options?:{name?:string;language?:string;url?:string}){
   if(c.sandbox)throw new BusinessError('Una simulación no puede enviar mensajes externos');
   if(process.env.ALLOW_LIVE_MESSAGES!=='true')throw new DeliveryError('La entrega en vivo está desactivada');
   const version=process.env.META_GRAPH_VERSION;
   if(!version||!/^v\d+\.\d+$/.test(version))throw new DeliveryError('Falta configurar la versión de Meta');
+  if(kind==='image')try{const u=new URL(String(options?.url||''));if(u.protocol!=='https:'||u.username||u.password||u.port||net.isIP(u.hostname)||u.hostname==='localhost'||!u.hostname.includes('.'))throw new Error();}catch{throw new DeliveryError('La foto del producto no tiene una dirección HTTPS pública válida');}
   let url:string,token:string|undefined,body:any;
   if(c.channel==='whatsapp'){
     token=process.env.WHATSAPP_ACCESS_TOKEN;const phone=await configuredWhatsAppPhoneId();
     if(!token||!phone)throw new DeliveryError('WhatsApp no está conectado');
     url=`https://graph.facebook.com/${version}/${phone}/messages`;
-    body=kind==='template'?{messaging_product:'whatsapp',to:c.external_id,type:'template',template:{name:template?.name,language:{code:template?.language}}}:{messaging_product:'whatsapp',to:c.external_id,type:'text',text:{body:text,preview_url:false}};
+    body=kind==='template'?{messaging_product:'whatsapp',to:c.external_id,type:'template',template:{name:options?.name,language:{code:options?.language}}}:kind==='image'?{messaging_product:'whatsapp',to:c.external_id,type:'image',image:{link:options?.url}}:{messaging_product:'whatsapp',to:c.external_id,type:'text',text:{body:text,preview_url:false}};
   }else{
     if(kind==='template')throw new DeliveryError('Instagram no permite este seguimiento automático');
     token=process.env.INSTAGRAM_ACCESS_TOKEN;const account=process.env.INSTAGRAM_ACCOUNT_ID;
     if(!token||!account)throw new DeliveryError('Instagram no está conectado');
     url=`https://graph.instagram.com/${version}/${account}/messages`;
-    body={recipient:{id:c.external_id},message:{text}};
+    body=kind==='image'?{recipient:{id:c.external_id},message:{attachment:{type:'image',payload:{url:options?.url}}}}:{recipient:{id:c.external_id},message:{text}};
   }
   let r:globalThis.Response;
   try{r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(15000)});}catch{throw new DeliveryError('Meta no confirmó la recepción; revisar antes de reenviar',false,true);}

@@ -53,12 +53,13 @@ export async function receive(input:{channel:Channel;externalId:string;providerI
       }
     }
     const current=await conversation(id,tx);
-    const m=await tx.execute({sql:'INSERT INTO crm_messages(conversation_id,provider_id,direction,author,text,kind,created_at,processable,opportunity_id) VALUES(?,?,?,?,?,?,?,?,?)',args:[id,providerId,'in','customer',input.text,input.kind||'text',time,Number(processable),current.opportunity_id]});
+    const waitsForTranscription=!sandbox&&processable&&input.kind==='audio'&&!!input.attachments?.length&&process.env.AUTO_TRANSCRIBE_AUDIO==='true'&&process.env.ALLOW_MEDIA_DOWNLOADS==='true';
+    const m=await tx.execute({sql:'INSERT INTO crm_messages(conversation_id,provider_id,direction,author,text,kind,created_at,processable,opportunity_id) VALUES(?,?,?,?,?,?,?,?,?)',args:[id,providerId,'in','customer',input.text,input.kind||'text',time,Number(processable&&!waitsForTranscription),current.opportunity_id]});
     if(input.attachments?.length)await registerAttachments(Number(m.lastInsertRowid),current,input.attachments,tx);
     // MAX evita que un webhook atrasado vuelva a abrir la ventana de atención.
     if(processable){
       await tx.execute({sql:"UPDATE crm_conversations SET last_inbound=?,updated_at=?,followup_attempts=0,archived_at=NULL,next_action_at=NULL,next_action_note=NULL WHERE id=?",args:[time,now,id]});
-      await tx.execute({sql:'INSERT INTO crm_jobs(conversation_id,message_id,ready_at) VALUES(?,?,?)',args:[id,Number(m.lastInsertRowid),new Date(Date.now()+1800).toISOString()]});
+      if(!waitsForTranscription)await tx.execute({sql:'INSERT INTO crm_jobs(conversation_id,message_id,ready_at) VALUES(?,?,?)',args:[id,Number(m.lastInsertRowid),new Date(Date.now()+1800).toISOString()]});
     }
     if(optedOut(input.text))await stopContact(id,tx);
     await tx.commit();if(processable&&current.status!=='active')await notifyTeam(id,'Nuevo mensaje en una conversación cerrada; revisar sin alterar la venta',current.owner_id,true);return {id,messageId:Number(m.lastInsertRowid),duplicate:false};

@@ -55,7 +55,7 @@ export async function messagePage(id:number,before?:number,after?:number){
   const r=(await db.execute({sql:`SELECT id,conversation_id,direction,author,text,kind,delivery,created_at,opportunity_id FROM crm_messages WHERE conversation_id=? ${before?'AND id<?':after?'AND id>?':''} ORDER BY id ${after?'ASC':'DESC'} LIMIT 51`,args:before?[id,before]:after?[id,after]:[id]})).rows;
   const rows=after?r.slice(0,50):r.slice(0,50).reverse();
   const ids=rows.map(m=>Number(m.id));
-  const attachments=ids.length?(await db.execute({sql:`SELECT id,message_id,mime,name,status,size_bytes,error FROM crm_attachments WHERE message_id IN(${ids.map(()=>'?').join(',')}) ORDER BY id`,args:ids})).rows:[];
+  const attachments=ids.length?(await db.execute({sql:`SELECT id,message_id,mime,name,status,size_bytes,error,transcript,transcribed_at,transcription_status FROM crm_attachments WHERE message_id IN(${ids.map(()=>'?').join(',')}) ORDER BY id`,args:ids})).rows:[];
   const messages=rows.map(m=>({...m,attachments:attachments.filter(a=>Number(a.message_id)===Number(m.id))}));
   return {messages,hasMore:r.length>50,before:rows.length?Number(rows[0].id):null,after:rows.length?Number(rows[rows.length-1].id):after||null};
 }

@@ -21,6 +21,7 @@ interface StockItem {
   precio_venta_usd?: number | null;
   cantidad: number; battery_pct?: number|null; repairs?:string|null; warranty_months?:number|null;
   categoria?: string | null;
+  image_url?: string | null;
 }
 
 const EMPTY_FORM = {
@@ -32,7 +33,7 @@ const EMPTY_FORM = {
   precio_costo_usd: '',
   precio_venta_usd: '',
   cantidad: '1',
-  categoria: 'iPhone', battery_pct:'', repairs:'', warranty_months:'',
+  categoria: 'iPhone', battery_pct:'', repairs:'', warranty_months:'', image_url:'',
 };
 
 type FormState = typeof EMPTY_FORM;
@@ -108,7 +109,7 @@ export default function Stock() {
       precio_costo_usd: it.precio_costo_usd != null ? String(it.precio_costo_usd) : '',
       precio_venta_usd: it.precio_venta_usd != null ? String(it.precio_venta_usd) : '',
       cantidad: String(it.cantidad ?? 0),
-      categoria: it.categoria ?? 'iPhone', battery_pct:it.battery_pct==null?'':String(it.battery_pct),repairs:it.repairs||'',warranty_months:it.warranty_months==null?'':String(it.warranty_months),
+      categoria: it.categoria ?? 'iPhone', battery_pct:it.battery_pct==null?'':String(it.battery_pct),repairs:it.repairs||'',warranty_months:it.warranty_months==null?'':String(it.warranty_months),image_url:it.image_url||'',
     });
     setModalOpen(true);
   };
@@ -124,7 +125,7 @@ export default function Stock() {
       precio_costo_usd: Number(form.precio_costo_usd) || 0,
       precio_venta_usd: Number(form.precio_venta_usd) || 0,
       cantidad: Number(form.cantidad) || 0,
-      categoria: form.categoria, battery_pct:form.battery_pct===''?null:Number(form.battery_pct),repairs:form.repairs||null,warranty_months:form.warranty_months===''?null:Number(form.warranty_months),
+      categoria: form.categoria, battery_pct:form.battery_pct===''?null:Number(form.battery_pct),repairs:form.repairs||null,warranty_months:form.warranty_months===''?null:Number(form.warranty_months),image_url:form.image_url||null,
     };
     try {
       if (editando) await api.put(`/api/stock/${editando.id}`, body);
@@ -373,6 +374,7 @@ export default function Stock() {
           <div><Label>Batería % (dato verificado)</Label><Input type="number" min="1" max="100" value={form.battery_pct} onChange={e=>setForm({...form,battery_pct:e.target.value})} placeholder="Vacío si no está verificado"/></div>
           <div><Label>Garantía comercial en meses</Label><Select value={form.warranty_months} onChange={e=>setForm({...form,warranty_months:e.target.value})}><option value="">Por confirmar</option><option value="3">3 meses · seminuevo</option><option value="6">6 meses · OEM</option><option value="12">12 meses · sellado</option></Select></div>
           <div className="md:col-span-2"><Label>Reparaciones y estado interno</Label><Input value={form.repairs} onChange={e=>setForm({...form,repairs:e.target.value})} placeholder="Información verificada por oficina"/></div>
+          <div className="md:col-span-2"><Label>Foto pública del equipo (HTTPS)</Label><Input type="url" value={form.image_url} onChange={e=>setForm({...form,image_url:e.target.value})} placeholder="https://..."/></div>
           <div>
             <Label>Costo (USD) · administración</Label>
             <Input type="number" min={0} disabled={!esAdmin} value={form.precio_costo_usd} onChange={(e) => setForm({ ...form, precio_costo_usd: e.target.value })} />

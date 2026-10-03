@@ -11,6 +11,7 @@ import {connectionStatus} from './meta';
 import {receive,conversation,enqueueReply,transfer,BusinessError,nowIso} from './repository';
 import {quote,stockAvailable,createReservation,confirmDeposit,completeSale,slots} from './commerce';
 import {processJob} from './engine';
+import {transcribeAttachment} from './transcription';
 export const automationRouter=Router();automationRouter.use(authRequired);
 const wrap=(fn:(req:AuthRequest,res:Response)=>Promise<any>)=>(req:Request,res:Response,next:NextFunction)=>{void fn(req as AuthRequest,res).catch(next);};
 async function access(req:AuthRequest,id=Number(req.params.id)){
@@ -76,6 +77,11 @@ automationRouter.get('/attachments/:attachmentId',wrap(async(req,res)=>{
   const mime=String(a.mime||'application/octet-stream');const inline=/^(image\/(jpeg|png|webp|gif)|audio\/(mpeg|ogg|mp4|aac|wav|webm)|video\/(mp4|webm))$/.test(mime);
   res.setHeader('Content-Type',inline?mime:'application/octet-stream');res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Content-Disposition',`${inline?'inline':'attachment'}; filename="adjunto-${a.id}"`);
   res.sendFile(attachmentPath(String(a.storage_key)),err=>{if(err&&!res.headersSent)res.status(404).json({error:'Archivo no disponible; revisar respaldo'});});
+}));
+automationRouter.post('/attachments/:attachmentId/transcribe',wrap(async(req,res)=>{
+  const a=(await db.execute({sql:'SELECT id,conversation_id FROM crm_attachments WHERE id=?',args:[Number(req.params.attachmentId)]})).rows[0];
+  if(!a)throw new BusinessError('Adjunto inexistente',404);await access(req,Number(a.conversation_id));
+  res.json({text:await transcribeAttachment(Number(a.id))});
 }));
 automationRouter.get('/conversations/:id/messages',wrap(async(req,res)=>{
   const c=await access(req);const before=req.query.before?Number(req.query.before):undefined,after=req.query.after?Number(req.query.after):undefined;

@@ -5,6 +5,7 @@ import {settings,event,notifyTeam} from './schema';
 import {conversation,enqueueReply,transfer,nowIso,stopContact} from './repository';
 import {qualify,handoffReason,normalizePhone,EMPTY_QUALIFICATION,optedOut,windowOpen} from './domain';
 import {stockAvailable,matchingStock,tradeValue,quote,quoteText,slots,bookAppointment,money} from './commerce';
+const wantsProductImage=(text:string)=>/\b(foto|fotos|imagen|imágenes|imagenes|photo|picture)\b/i.test(text);
 export async function processJob(job:any){
   let c=await conversation(Number(job.conversation_id));
   const latest=(await db.execute({sql:"SELECT id FROM crm_messages WHERE conversation_id=? AND direction='in' AND processable=1 ORDER BY id DESC LIMIT 1",args:[c.id]})).rows[0];
@@ -27,7 +28,7 @@ export async function processJob(job:any){
   if(q.intent==='opt_out'){await stopContact(c.id);await event(c.id,'optout','Solicitud de baja identificada en la conversación');return;}
   handoff=handoff||handoffReason(q,String(last.text));
   if(!handoff&&q.confidence<.65)handoff='Consulta ambigua: necesita un closer';
-  const rating=qualify(q,!!c.verified_returning);let reply='';
+  const rating=qualify(q,!!c.verified_returning);let reply='',productImage:string|null=null;
   if(handoff){reply=q.intent==='warranty'?'Te paso con oficina para revisar la garantía y ayudarte con el equipo.':q.intent==='payment'||/se[ñn]a|transfer[ií]|comprobante/i.test(String(last.text))?'Recibí tu aviso. Administración va a verificar el ingreso del dinero antes de confirmar el pago o la reserva.':'Te paso con el equipo para revisar esto y ayudarte.';}
   else if(q.topic==='hours')reply='Atendemos con turno en Neuquén capital. Lunes, miércoles, viernes y sábados de 11 a 18; martes, jueves y domingos de 13 a 20. Por acá puedo ayudarte las 24 horas. ¿Querés que veamos un turno de 15 minutos?';
   else if(q.topic==='location'){if(s.storeAddress)reply=`Estamos en ${s.storeAddress}, Neuquén capital. La atención es con turno de 15 minutos. ¿Qué día te queda cómodo?`;else{handoff='Confirmar dirección del local';reply='Estamos en Neuquén capital y atendemos con turno. Te paso con el equipo para compartirte la ubicación exacta.';}}
@@ -51,7 +52,7 @@ export async function processJob(job:any){
         const available=await stockAvailable();const matches=matchingStock(available,q.product);
         if(!matches.length){const alternatives=available.filter(x=>Number(x.available)>0&&(!q.budgetUsd||Number(x.precio_venta_usd)<=q.budgetUsd)).slice(0,3);reply=`No veo ${q.product} disponible en este momento.`+(alternatives.length?' Tenemos '+alternatives.map(x=>`${x.modelo} ${x.capacidad||''}`).join(', ')+'. ¿Querés que te cotice alguno?':' Te paso con el equipo para consultar una alternativa.');if(!alternatives.length)handoff='Sin stock para la consulta';}
         else if(matches.length>1){reply='Para ese modelo tengo estas opciones: '+matches.slice(0,4).map(x=>`${x.modelo} ${x.capacidad||''} ${x.color||''} (${x.condicion||'estado a confirmar'})`).join(' · ')+'. ¿Cuál preferís?';}
-        else{const estimate=await quote(c.id,Number(matches[0].id),q.priceObjection,tradeCredit,q);reply=quoteText(estimate)+(q.timeframe==='later'&&!c.followup_optin?' ¿Me autorizás a escribirte por acá en 48 horas para retomar esta consulta?':q.payment?' ¿Querés que veamos un turno para que lo conozcas?':' ¿Preferís abonar al contado o en cuotas?');}
+        else{const estimate=await quote(c.id,Number(matches[0].id),q.priceObjection,tradeCredit,q);reply=quoteText(estimate)+(q.timeframe==='later'&&!c.followup_optin?' ¿Me autorizás a escribirte por acá en 48 horas para retomar esta consulta?':q.payment?' ¿Querés que veamos un turno para que lo conozcas?':' ¿Preferís abonar al contado o en cuotas?');if(wantsProductImage(String(last.text))){if(matches[0].image_url)productImage=String(matches[0].image_url);else reply+=' Todavía no tenemos una foto cargada de esta unidad.';}}
       }
     }
   }
@@ -63,6 +64,7 @@ export async function processJob(job:any){
     if(q.phone){const phone=normalizePhone(q.phone);if(phone)await tx.execute({sql:'UPDATE crm_contacts SET phone=? WHERE id=?',args:[phone,c.contact_id]});}
     if(c.lead_id){await tx.execute({sql:"UPDATE leads SET estado=?,notas=? WHERE id=? AND estado NOT IN('Ganado','Perdido')",args:[rating.score>=65?'Negociando':rating.score>=35?'Interesado':'Contactado',`${q.summary}\nPrioridad: ${rating.tier}. ${rating.reasons.join('. ')}`,c.lead_id]});}
     await snapshotOpportunity(await conversation(c.id,tx),tx);
+    if(productImage)await enqueueReply(c.id,'Foto del equipo solicitado','ai',Number(job.message_id),'image',JSON.stringify({url:productImage}),tx);
     if(reply)await enqueueReply(c.id,reply,handoff?'system':'ai',Number(job.message_id),'text',null,tx);
     if(handoff)await tx.execute({sql:"UPDATE crm_conversations SET mode='human',handoff_reason=? WHERE id=?",args:[handoff,c.id]});
     await tx.commit();if(handoff){await event(c.id,'handoff',handoff);await notifyTeam(c.id,handoff,c.owner_id,true);}else if(rating.score>=65&&Number(c.score)<65)await notifyTeam(c.id,'Alta intención de compra: '+q.summary,c.owner_id);await event(c.id,'qualified',`${rating.score}/100 · ${rating.reasons.join(', ')}`);
