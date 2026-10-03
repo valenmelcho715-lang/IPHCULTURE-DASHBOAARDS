@@ -71,6 +71,12 @@ test('Canje pide juntos los datos faltantes y no interroga mensaje por mensaje',
   const android=commerce.tradeValue({...domain.EMPTY_QUALIFICATION,tradeBrand:'Samsung',tradeModel:'Galaxy S23'},s).question;
   assert.doesNotMatch(android,/batería/);assert.match(android,/Capacidad \(GB\)/);
 });
+test('La respuesta de canje muestra la toma y resta la diferencia calculada',()=>{
+  const text=commerce.quoteText({product:'iPhone 15',condition:'Nuevo',baseUsd:900,discountUsd:0,tradeCreditUsd:150,totalUsd:750,totalArs:1260000,fx:1680});
+  assert.match(text,/Genial, según el sistema tomaríamos tu equipo en USD 150/);
+  assert.match(text,/Descontando el canje, la diferencia por el equipo que querés es de USD 750/);
+  assert.match(text,/sujeto a revisión física/);
+});
 test('El puntaje usa datos de compra y no castiga la demora al responder',()=>{
   const q={...domain.EMPTY_QUALIFICATION,product:'iPhone 13',budgetUsd:600,payment:'Efectivo',timeframe:'today'};
   assert.equal(domain.qualify(q).score,75);assert.ok(domain.qualify(q).reasons.includes('Quiere comprar hoy'));
