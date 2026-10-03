@@ -52,6 +52,10 @@ export async function initAutomation() {
   const followupColumns=(await db.execute('PRAGMA table_info(crm_followups)')).rows.map(x=>String(x.name));
   if(!followupColumns.includes('sent_at')) await db.execute('ALTER TABLE crm_followups ADD COLUMN sent_at TEXT');
   await db.execute({sql:'INSERT INTO crm_settings(id,value) VALUES(1,?) ON CONFLICT(id) DO NOTHING',args:[JSON.stringify(DEFAULT_SETTINGS)]});
+  // Regla comercial confirmada: el anterior valor inicial de USD 20 pasa a USD 15.
+  // Solo se migra el valor heredado exacto para no pisar otra decisión del administrador.
+  const stored=await settings();
+  if(stored.maxDiscountUsd===20){stored.maxDiscountUsd=15;await db.execute({sql:'UPDATE crm_settings SET value=? WHERE id=1',args:[JSON.stringify(stored)]});}
   const stockColumns=(await db.execute('PRAGMA table_info(stock)')).rows.map(x=>String(x.name));
   for(const [name,type] of [['battery_pct','INTEGER'],['repairs','TEXT'],['warranty_months','INTEGER']]) if(!stockColumns.includes(name)) await db.execute(`ALTER TABLE stock ADD COLUMN ${name} ${type}`);
   const saleColumns=(await db.execute('PRAGMA table_info(ventas)')).rows.map(x=>String(x.name));
