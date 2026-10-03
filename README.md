@@ -78,6 +78,7 @@ Guías operativas:
 - [Migración segura](docs/MIGRACION.md)
 - [Almacenamiento, respaldo y recuperación](docs/ALMACENAMIENTO.md)
 - [Seguridad y rotación de credenciales](docs/SEGURIDAD.md)
+- [Voz y respuestas de Atención IA](docs/RESPUESTAS_IA.md)
 
 ## Estado de activación
 

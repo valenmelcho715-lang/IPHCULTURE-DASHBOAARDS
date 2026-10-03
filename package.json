@@ -21,6 +21,7 @@
     "preflight:live": "node scripts/doctor.cjs --strict --live"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "playwright": "^1.63.0"
   }
 }

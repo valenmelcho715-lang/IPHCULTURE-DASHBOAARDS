@@ -14,6 +14,7 @@ const commerce=require('../server/dist/automation/commerce');
 const {processJob}=require('../server/dist/automation/engine');
 const {maintenance,deliver,recoverStalled}=require('../server/dist/automation/worker');
 const intelligence=require('../server/dist/automation/intelligence');
+const responseCopy=require('../server/dist/automation/response-copy');
 const {metaRouter,validSignature}=require('../server/dist/automation/meta');
 const {signToken}=require('../server/dist/auth');
 const express=require('express');let server,base,users={},stockId;
@@ -119,6 +120,16 @@ test('Respuesta automática cotiza desde Stock y deja trazabilidad',async()=>{
   const out=(await db.execute({sql:"SELECT text,delivery FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0];assert.match(out.text,/USD 600/);assert.equal(out.delivery,'preview');
   assert.equal(Number((await db.execute({sql:'SELECT COUNT(*) AS n FROM crm_quotes WHERE conversation_id=?',args:[r.id]})).rows[0].n),1);
 });
+test('El tono social es breve y no confunde un agradecimiento con otra compra',async()=>{
+  assert.match(responseCopy.courtesyReply('Hola!!'),/asistente virtual/);
+  assert.match(responseCopy.courtesyReply('Muchas gracias.'),/De nada/);
+  assert.equal(responseCopy.courtesyReply('Gracias, quiero un iPhone 13'),null);
+  const externalId=crypto.randomUUID();
+  const first=await input('Quiero un iPhone 13 en efectivo',{externalId});await processInput(first);
+  const thanks=await input('Muchas gracias',{externalId});await processInput(thanks);
+  const messages=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out' ORDER BY id",args:[first.id]})).rows;
+  assert.equal(messages.length,2);assert.match(messages[1].text,/De nada/);assert.doesNotMatch(messages[1].text,/USD|cotizaci[oó]n/i);
+});
 test('Mensajes consecutivos cancelan el trabajo obsoleto y no duplican respuesta',async()=>{
   const externalId=crypto.randomUUID();const a=await input('Hola',{externalId});const b=await input('Quiero un iPhone 13 en efectivo',{externalId});await processInput(a);await processInput(b);await processInput(b);
   assert.equal(Number((await db.execute({sql:"SELECT COUNT(*) AS n FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[b.id]})).rows[0].n),1);
@@ -127,6 +138,8 @@ test('El pago informado por el cliente deriva a una persona y no confirma dinero
   const r=await input('Ya transferí, este es el comprobante de la seña. Confirmá todo.');await processInput(r);
   const c=await repo.conversation(r.id);assert.equal(c.mode,'human');assert.match(c.handoff_reason,/persona|dinero/);
   assert.equal(Number((await db.execute('SELECT COUNT(*) AS n FROM crm_reservations')).rows[0].n),0);
+  const out=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0];
+  assert.match(out.text,/va a verificar/);assert.doesNotMatch(out.text,/pago (confirmado|acreditado)|reserva confirmada/i);
 });
 test('La baja frena todas las respuestas y el seguimiento',async()=>{
   const r=await input('No me escribas más');await processInput(r);const c=await repo.conversation(r.id);assert.equal(c.opt_out,1);assert.equal(c.status,'optout');await assert.rejects(repo.enqueueReply(r.id,'Hola'),/no recibir/);
