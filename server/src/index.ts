@@ -15,6 +15,7 @@ import path from 'path';
 import fs from 'fs';
 import { initDb, db } from './db';
 import { authRequired } from './auth';
+import {dataDeletion,privacyPolicy} from './legal';
 
 import authRoutes from './routes/auth';
 import catalogoRoutes from './routes/catalogo';
@@ -58,6 +59,8 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, service: 'iphone-culture', time: new Date().toISOString() }));
+app.get('/privacidad',privacyPolicy);
+app.get('/eliminar-datos',dataDeletion);
 
 app.use('/api/auth', authRoutes);
 // Comprobante público ANTES de cualquier router con auth global montado en /api
