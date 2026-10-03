@@ -5,7 +5,7 @@ import {settings,event,notifyTeam} from './schema';
 import {conversation,enqueueReply,transfer,nowIso,stopContact} from './repository';
 import {qualify,handoffReason,normalizePhone,EMPTY_QUALIFICATION,optedOut,windowOpen} from './domain';
 import {stockAvailable,matchingStock,tradeValue,quote,quoteText,slots,bookAppointment,money} from './commerce';
-import {courtesyReply,handoffReply,outOfStockReply,responseCopy} from './response-copy';
+import {courtesyReply,handoffReply,outOfStockReply,responseCopy,tradeEstimateReply} from './response-copy';
 export async function processJob(job:any){
   let c=await conversation(Number(job.conversation_id));
   const latest=(await db.execute({sql:"SELECT id FROM crm_messages WHERE conversation_id=? AND direction='in' AND processable=1 ORDER BY id DESC LIMIT 1",args:[c.id]})).rows[0];
@@ -49,7 +49,7 @@ export async function processJob(job:any){
     if(q.intent==='trade_in'||q.tradeModel){const trade=tradeValue(q,s);if(trade.manual){handoff='Canje para revisión de oficina';reply='Para cotizar ese canje correctamente necesito que lo revise oficina. Te paso con el equipo.';}else if(trade.question)tradeQuestion=trade.question;else tradeCredit=trade.value||0;}
     if(!handoff){
       if(tradeQuestion)reply=tradeQuestion;
-      else if(!q.product)reply=q.tradeModel?`El canje se estima en ${money(tradeCredit)}, sujeto a revisión física. ${responseCopy.askProduct}`:responseCopy.firstProductQuestion;
+      else if(!q.product)reply=q.tradeModel?`${tradeEstimateReply(money(tradeCredit))} ${responseCopy.askProduct}`:responseCopy.firstProductQuestion;
       else{
         const available=await stockAvailable();const matches=matchingStock(available,q.product);
         if(!matches.length){const alternatives=available.filter(x=>Number(x.available)>0&&(!q.budgetUsd||Number(x.precio_venta_usd)<=q.budgetUsd)).slice(0,3);const firstContact=history.filter(m=>m.direction==='in').length===1;reply=outOfStockReply(q.product,alternatives,firstContact);if(!alternatives.length)handoff='Sin stock para la consulta';}

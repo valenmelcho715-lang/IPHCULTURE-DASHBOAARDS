@@ -55,3 +55,7 @@ export function outOfStockReply(product:string,alternatives:Array<{modelo?:unkno
 export function tradeDetailsReply(fields:string[]):string {
   return `Para poder cotizar tu equipo necesito que me pases:\n${fields.map(field=>`• ${field}`).join('\n')}`;
 }
+
+export function tradeEstimateReply(value:string):string {
+  return `Genial, según el sistema tomaríamos tu equipo en ${value}, sujeto a revisión física.`;
+}

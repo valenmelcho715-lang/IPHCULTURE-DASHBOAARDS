@@ -4,7 +4,7 @@ import {Settings,Qualification,discountFor,finance,round2} from './domain';
 import {settings,event} from './schema';
 import {conversation,BusinessError,nowIso} from './repository';
 import {calcularCanjeiPhone,calcularCanjeAndroid,MODELOS_POR_MARCA,STORAGE_IPHONE,STORAGE_ANDROID,ESTADOS_IPHONE,ESTADOS_ANDROID} from './trade-rules';
-import {tradeDetailsReply} from './response-copy';
+import {tradeDetailsReply,tradeEstimateReply} from './response-copy';
 export const money=(n:number)=>`USD ${n.toLocaleString('es-AR',{maximumFractionDigits:2})}`;
 export const pesos=(n:number)=>`$ ${n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 export async function stockAvailable(tx:any=db):Promise<any[]> {
@@ -62,7 +62,7 @@ export async function quote(id:number,stockId:number,applyDiscount=false, tradeC
 export function quoteText(q:any):string {
   const lines=[`Tenemos disponible ${q.product}${q.condition?` (${q.condition})`:''}.`,`Precio: ${money(q.baseUsd)}.`];
   if(q.discountUsd)lines.push(`Con el beneficio aplicado: ${money(q.baseUsd-q.discountUsd)}.`);
-  if(q.tradeCreditUsd)lines.push(`Canje estimado: ${money(q.tradeCreditUsd)}, sujeto a revisión física.`,`Diferencia estimada: ${money(q.totalUsd)}.`);
+  if(q.tradeCreditUsd)lines.push(tradeEstimateReply(money(q.tradeCreditUsd)),`Descontando el canje, la diferencia por el equipo que querés es de ${money(q.totalUsd)}.`);
   lines.push(`En pesos: ${pesos(q.totalArs)} (USD a ${q.fx}).`);
   if(q.finance)lines.push(`${q.finance.cuotas} cuotas con interés de ${pesos(q.finance.cuotaArs)}; total financiado ${pesos(q.finance.totalArs)}.`);
   if(q.battery!=null)lines.push(`Batería: ${q.battery}%.`);

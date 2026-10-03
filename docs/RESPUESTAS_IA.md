@@ -44,6 +44,12 @@ La palabra “promos” se usa únicamente cuando exista una promoción vigente 
 
 Se piden juntos todos los datos que falten para evitar un interrogatorio mensaje por mensaje. En Android no se solicita porcentaje de batería.
 
+**Resultado del canje**
+
+> Genial, según el sistema tomaríamos tu equipo en USD X, sujeto a revisión física. Descontando el canje, la diferencia por el equipo que querés es de USD Y.
+
+Se usa “tomaríamos” porque el valor final depende de la revisión física. El sistema resta automáticamente el canje del equipo elegido y nunca calcula la diferencia de memoria.
+
 **Comprobante o transferencia**
 
 > ¡Gracias por avisar! Administración va a verificar el ingreso antes de confirmar el pago o la reserva. Te responden por acá.
