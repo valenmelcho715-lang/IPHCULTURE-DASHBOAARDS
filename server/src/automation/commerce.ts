@@ -4,6 +4,7 @@ import {Settings,Qualification,discountFor,finance,round2} from './domain';
 import {settings,event} from './schema';
 import {conversation,BusinessError,nowIso} from './repository';
 import {calcularCanjeiPhone,calcularCanjeAndroid,MODELOS_POR_MARCA,STORAGE_IPHONE,STORAGE_ANDROID,ESTADOS_IPHONE,ESTADOS_ANDROID} from './trade-rules';
+import {tradeDetailsReply} from './response-copy';
 export const money=(n:number)=>`USD ${n.toLocaleString('es-AR',{maximumFractionDigits:2})}`;
 export const pesos=(n:number)=>`$ ${n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 export async function stockAvailable(tx:any=db):Promise<any[]> {
@@ -23,16 +24,22 @@ export function matchingStock(items:any[],product:string):any[] {
   });
 }
 export function tradeValue(q:Qualification,s:Settings):{value:number|null;question?:string;manual?:boolean} {
-  if(!q.tradeModel)return {value:null,question:'¿Qué modelo querés entregar en canje?'};
-  if(!q.tradeBrand)return {value:null,question:'¿De qué marca es el equipo que entregás?'};
+  if(!q.tradeModel||!q.tradeBrand){
+    const fields=[];
+    if(!q.tradeBrand)fields.push('Marca');
+    if(!q.tradeModel)fields.push('Modelo exacto');
+    fields.push('Capacidad (GB)','Porcentaje de batería, si es iPhone','Si tiene algún detalle estético, falla interna o reparación');
+    return {value:null,question:tradeDetailsReply(fields)};
+  }
   const brand=q.tradeBrand as keyof typeof MODELOS_POR_MARCA;
   if(!MODELOS_POR_MARCA[brand]?.includes(q.tradeModel))return {value:null,manual:true};
-  if(!q.tradeStorage)return {value:null,question:'¿Qué capacidad tiene tu equipo? Necesito identificar la versión exacta para cotizarlo.'};
+  const missing=[];
+  if(!q.tradeStorage)missing.push('Capacidad (GB)');
+  if(brand==='iPhone'&&q.tradeBattery==null)missing.push('Porcentaje de batería');
+  if(!q.tradeCondition||q.tradeRepaired==null||q.tradeInternalOk==null)missing.push('Si tiene algún detalle estético, falla interna o reparación');
+  if(missing.length)return {value:null,question:tradeDetailsReply(missing)};
   if(!(brand==='iPhone'?STORAGE_IPHONE:STORAGE_ANDROID).some(x=>x===q.tradeStorage))return {value:null,question:'Necesito confirmar la capacidad exacta del equipo antes de valorarlo. ¿Cuántos GB tiene?'};
-  if(brand==='iPhone'&&q.tradeBattery==null)return {value:null,question:'¿Qué porcentaje de salud de batería tiene? Lo ves en Configuración → Batería → Salud de la batería.'};
-  if(!q.tradeCondition)return {value:null,question:'¿Cómo está de pantalla, marco y parte trasera? ¿Tiene golpes o rayas?'};
   if(!(brand==='iPhone'?ESTADOS_IPHONE:ESTADOS_ANDROID).some(x=>x===q.tradeCondition))return {value:null,manual:true};
-  if(q.tradeRepaired==null||q.tradeInternalOk==null)return {value:null,question:'¿Funciona todo correctamente? ¿Tuvo alguna reparación o cambio de piezas?'};
   if(q.tradeRepaired||!q.tradeInternalOk)return {value:null,manual:true};
   const r=brand==='iPhone'?calcularCanjeiPhone({modelo:q.tradeModel,storage:q.tradeStorage as any,bateriaPct:q.tradeBattery,estado:q.tradeCondition as any}):calcularCanjeAndroid({marca:brand,modelo:q.tradeModel,storage:q.tradeStorage as any,estado:q.tradeCondition as any});
   if(r.valorFinal==null)return {value:null,manual:true};

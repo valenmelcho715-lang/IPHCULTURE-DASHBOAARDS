@@ -51,3 +51,7 @@ export function outOfStockReply(product:string,alternatives:Array<{modelo?:unkno
   const options=alternatives.map(item=>`${String(item.modelo||'').trim()} ${String(item.capacidad||'').trim()}`.trim()).join(', ');
   return `${hello}${unavailable}, pero tengo algunas opciones que quizás te sirvan: ${options}. ¿Querés que te cuente más?`;
 }
+
+export function tradeDetailsReply(fields:string[]):string {
+  return `Para poder cotizar tu equipo necesito que me pases:\n${fields.map(field=>`• ${field}`).join('\n')}`;
+}
