@@ -18,6 +18,7 @@ import { authRequired } from './auth';
 import {securityHeaders} from './security';
 import {apiErrorHandler,apiNotFound} from './errors';
 import {healthHandler} from './health';
+import {dataDeletion,privacyPolicy} from './legal';
 import type {Server} from 'node:http';
 
 import authRoutes from './routes/auth';
@@ -64,6 +65,8 @@ app.use((req, res, next) => {
 });
 
 app.get('/api/health',healthHandler);
+app.get('/privacidad',privacyPolicy);
+app.get('/eliminar-datos',dataDeletion);
 
 app.use('/api/auth', authRoutes);
 // Comprobante público ANTES de cualquier router con auth global montado en /api
