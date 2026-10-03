@@ -67,6 +67,12 @@ test('El puntaje usa datos de compra y no castiga la demora al responder',()=>{
   const q={...domain.EMPTY_QUALIFICATION,product:'iPhone 13',budgetUsd:600,payment:'Efectivo',timeframe:'today'};
   assert.equal(domain.qualify(q).score,75);assert.ok(domain.qualify(q).reasons.includes('Quiere comprar hoy'));
 });
+test('El modo demo reconoce presupuesto con preposición y separa el equipo de canje',()=>{
+  const budget=intelligence.demoExtract('Tengo presupuesto de USD 800 y busco un iPhone 14.',domain.EMPTY_QUALIFICATION);
+  assert.equal(budget.budgetUsd,800);assert.match(budget.product,/iPhone 14/i);assert.equal(budget.intent,'buy');
+  const trade=intelligence.demoExtract('Entrego un iPhone 12 de 128 GB, batería 85 y detalles leves.',domain.EMPTY_QUALIFICATION);
+  assert.equal(trade.intent,'trade_in');assert.equal(trade.product,null);assert.equal(trade.tradeModel,'iPhone 12');assert.equal(trade.tradeBrand,'iPhone');assert.equal(trade.tradeBattery,85);assert.equal(trade.tradeCondition,'Detalles leves');
+});
 test('No entrega costos a closers ni oficina aunque soliciten la API directamente',async()=>{
   for(const role of ['closerA','office']){const r=await request('/api/stock',role);assert.equal(r.status,200);assert.equal('precio_costo_usd' in r.body[0],false);}
   assert.equal((await request('/api/stock','admin')).body[0].precio_costo_usd,400);

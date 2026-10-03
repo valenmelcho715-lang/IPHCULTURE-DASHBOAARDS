@@ -17,14 +17,22 @@ export const QUALIFICATION_SCHEMA={type:'object',additionalProperties:false,prop
 export function demoExtract(text:string, prior:Qualification):Qualification {
   const q={...EMPTY_QUALIFICATION,...prior,evidence:[] as string[],confidence:.8};
   const t=text.toLowerCase();
-  const model=text.match(/iphone\s*\d{1,2}(?:\s*pro\s*max|\s*pro|\s*plus)?|macbook(?:\s*air|\s*pro)?|airpods|apple watch|galaxy\s*s\d+/i)?.[0];
-  if(model)q.product=model;
-  const budget=text.match(/(?:presupuesto|tengo|hasta)\s*(?:usd|u\$s|\$)?\s*(\d{2,5})\s*(?:usd|d[oó]lares)?/i);if(budget)q.budgetUsd=Number(budget[1]);
+  const tradeMention=/\b(canje|entregar|entrego|entregaría|tomar mi equipo)\b/i.test(text);
+  const models=[...text.matchAll(/iphone\s*\d{1,2}(?:\s*pro\s*max|\s*pro|\s*plus)?|macbook(?:\s*air|\s*pro)?|airpods|apple watch|galaxy\s*s\d+/gi)].map(x=>x[0]);
+  const model=models[0];
+  if(tradeMention&&model){
+    q.tradeModel=model.replace(/^iphone/i,'iPhone').replace(/^galaxy/i,'Galaxy');
+    q.tradeBrand=/^iphone/i.test(model)?'iPhone':/^galaxy/i.test(model)?'Samsung':null;
+    q.product=models[1]||null;
+    const battery=text.match(/bater[ií]a(?:\s*(?:de|al))?\s*(\d{1,3})\s*%?/i);if(battery)q.tradeBattery=Number(battery[1]);
+    q.tradeCondition=/pantalla\s+dañada/i.test(text)?'Pantalla dañada':/golpes?\s+visibles?/i.test(text)?'Golpes visibles':/detalles?\s+leves?/i.test(text)?'Detalles leves':/excelente|como nuevo/i.test(text)?'Excelente':q.tradeCondition;
+  }else if(model)q.product=model;
+  const budget=text.match(/(?:presupuesto(?:\s+de)?|tengo(?:\s+(?:un\s+)?presupuesto(?:\s+de)?)?|hasta)\s*(?:usd|u\$s|\$)?\s*(\d{2,5})\s*(?:usd|d[oó]lares)?/i);if(budget)q.budgetUsd=Number(budget[1]);
   const installments=text.match(/\b(1|2|3|6|9|12)\s*cuotas/i);if(installments){q.installments=Number(installments[1]);q.payment='Tarjeta de crédito';}
   if(/efectivo|contado/.test(t))q.payment='Efectivo';
   if(/transferencia/.test(t))q.payment='Transferencia';
   if(/hoy|ahora/.test(t))q.timeframe='today';else if(/semana/.test(t))q.timeframe='week';else if(/m[aá]s adelante|otro mes|el mes que viene/.test(t))q.timeframe='later';
-  q.intent=optedOut(text)?'opt_out':/garant[ií]a/.test(t)?'warranty':/reclamo|denuncia|no funciona/.test(t)?'complaint':/se[ñn]a|transfer[ií]|comprobante/.test(t)?'payment':/turno|pasar|visitar/.test(t)?'appointment':/canje|entregar/.test(t)?'trade_in':model?'buy':'question';
+  q.intent=optedOut(text)?'opt_out':/garant[ií]a/.test(t)?'warranty':/reclamo|denuncia|no funciona/.test(t)?'complaint':/se[ñn]a|transfer[ií]|comprobante/.test(t)?'payment':/turno|pasar|visitar/.test(t)?'appointment':tradeMention?'trade_in':model?'buy':'question';
   q.priceObjection=/caro|descuento|mejor precio/.test(t);
   q.topic=/horario|qu[eé] hora.*atienden/.test(t)?'hours':/direcci[oó]n|ubicaci[oó]n|d[oó]nde (est[aá]n|queda)/.test(t)?'location':/medios de pago|formas de pago|c[oó]mo (puedo )?pagar/.test(t)?'payment_options':/devoluci[oó]n|devolver|cancelar compra/.test(t)?'returns':'product';
   if(/s[ií],?\s*(pod[eé]s|pueden)\s*(escribirme|contactarme)/.test(t))q.consent=true;
