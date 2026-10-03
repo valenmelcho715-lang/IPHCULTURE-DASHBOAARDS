@@ -56,7 +56,13 @@ export async function quote(id:number,stockId:number,applyDiscount=false, tradeC
   const discountReason=!discount?null:c.verified_returning?(applyDiscount&&s.stackReturningDiscount?'returning_and_price':'returning'):applyDiscount?'best_price':null;
   const detail:any={opportunityId:c.opportunity_id,stockId,product:`${item.modelo} ${item.capacidad||''} ${item.color||''}`.trim(),condition:item.condicion,baseUsd:Number(item.precio_venta_usd),discountUsd:discount,discountReason,tradeCreditUsd:tradeCredit,totalUsd:total,fx:s.usdArs,totalArs:round2(total*s.usdArs),battery:item.battery_pct,repairs:item.repairs,warrantyMonths:item.warranty_months,source:'stock',provisionalTrade:tradeCredit>0};
   const requested=qualification||c.qualification;
-  if(requested.installments){const fees=(await db.execute({sql:'SELECT * FROM cuotas_fees WHERE cuotas=?',args:[requested.installments]})).rows[0];if(fees)detail.finance=finance(total,s.usdArs,fees);}
+  const cardPayment=/tarjeta|cuotas?/i.test(String(requested.payment||''));
+  if(requested.installments||cardPayment){
+    const plans=requested.installments?[requested.installments]:[1,3,6,9,12];
+    const fees=(await db.execute({sql:`SELECT * FROM cuotas_fees WHERE cuotas IN (${plans.map(()=>'?').join(',')}) ORDER BY cuotas`,args:plans})).rows;
+    detail.financeOptions=fees.map(row=>finance(total,s.usdArs,row));
+    if(requested.installments&&detail.financeOptions[0])detail.finance=detail.financeOptions[0];
+  }
   const expires=new Date(Date.now()+15*60_000).toISOString();
   const r=await db.execute({sql:'INSERT INTO crm_quotes(conversation_id,stock_id,detail,total_usd,expires_at,created_at) VALUES(?,?,?,?,?,?)',args:[id,stockId,JSON.stringify(detail),total,expires,nowIso()]});
   return {id:Number(r.lastInsertRowid),...detail,expiresAt:expires};
@@ -72,7 +78,10 @@ export function quoteText(q:any):string {
   }
   if(q.tradeCreditUsd)lines.push(tradeEstimateReply(money(q.tradeCreditUsd)),`Descontando el canje, la diferencia por el equipo que querés es de ${money(q.totalUsd)}.`);
   lines.push(`En pesos: ${pesos(q.totalArs)} (USD a ${q.fx}).`);
-  if(q.finance)lines.push(`${q.finance.cuotas} cuotas con interés de ${pesos(q.finance.cuotaArs)}; total financiado ${pesos(q.finance.totalArs)}.`);
+  if(q.financeOptions?.length){
+    lines.push('Sí, por supuesto. Te paso cómo queda:');
+    for(const option of q.financeOptions)lines.push(`• ${option.cuotas} ${option.cuotas===1?'cuota':'cuotas'} de ${pesos(option.cuotaArs)}`);
+  }
   if(q.battery!=null)lines.push(`Batería: ${q.battery}%.`);
   if(q.repairs)lines.push(`Reparaciones informadas: ${String(q.repairs).slice(0,250)}.`);
   if(q.warrantyMonths)lines.push(`Garantía comercial: ${q.warrantyMonths} meses.`);

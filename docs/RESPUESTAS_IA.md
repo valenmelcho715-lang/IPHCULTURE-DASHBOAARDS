@@ -56,6 +56,18 @@ Se usa “tomaríamos” porque el valor final depende de la revisión física. 
 
 El descuento general máximo confirmado es USD 15. Se descuenta del equipo que compra la persona; no se altera artificialmente la valuación registrada del canje.
 
+**Consulta por cuotas**
+
+> Sí, por supuesto. Te paso cómo queda:
+> • 1 cuota de $ X
+> • 3 cuotas de $ X
+> • 6 cuotas de $ X
+> • 9 cuotas de $ X
+> • 12 cuotas de $ X
+> ¿Cuál opción te sirve?
+
+Los importes se calculan sobre la diferencia vigente después de canje y descuentos. La respuesta muestra únicamente el valor de cada cuota, no el total financiado. Si la persona pide una cantidad concreta, se muestra solo ese plan.
+
 **Comprobante o transferencia**
 
 > ¡Gracias por avisar! Administración va a verificar el ingreso antes de confirmar el pago o la reserva. Te responden por acá.
