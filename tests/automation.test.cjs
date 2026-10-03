@@ -121,7 +121,7 @@ test('Respuesta automática cotiza desde Stock y deja trazabilidad',async()=>{
   assert.equal(Number((await db.execute({sql:'SELECT COUNT(*) AS n FROM crm_quotes WHERE conversation_id=?',args:[r.id]})).rows[0].n),1);
 });
 test('El tono social es breve y no confunde un agradecimiento con otra compra',async()=>{
-  assert.match(responseCopy.courtesyReply('Hola!!'),/asistente virtual/);
+  assert.match(responseCopy.courtesyReply('Hola!!'),/¿Cómo estás\?.*asistente virtual.*Contame/);
   assert.match(responseCopy.courtesyReply('Muchas gracias.'),/De nada/);
   assert.equal(responseCopy.courtesyReply('Gracias, quiero un iPhone 13'),null);
   const externalId=crypto.randomUUID();
