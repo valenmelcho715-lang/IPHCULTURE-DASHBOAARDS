@@ -5,6 +5,7 @@ import {settings,event,notifyTeam} from './schema';
 import {conversation,enqueueReply,transfer,nowIso,stopContact} from './repository';
 import {qualify,handoffReason,normalizePhone,EMPTY_QUALIFICATION,optedOut,windowOpen} from './domain';
 import {stockAvailable,matchingStock,tradeValue,quote,quoteText,slots,bookAppointment,money} from './commerce';
+import {courtesyReply,handoffReply,outOfStockReply,responseCopy,tradeEstimateReply} from './response-copy';
 const wantsProductImage=(text:string)=>/\b(foto|fotos|imagen|imágenes|imagenes|photo|picture)\b/i.test(text);
 export async function processJob(job:any){
   let c=await conversation(Number(job.conversation_id));
@@ -21,19 +22,21 @@ export async function processJob(job:any){
   const s=await settings();if(!c.sandbox&&!s.enabled)return;
   if(!c.sandbox&&!windowOpen(c.last_inbound)){await transfer(c.id,'Mensaje recibido fuera de la ventana de respuesta; revisar el canal');return;}
   let q={...EMPTY_QUALIFICATION,...c.qualification};
+  const socialReply=courtesyReply(String(last.text));
   const immediateReason=handoffReason(q,String(last.text));
   let handoff:string|null=immediateReason;
   if(!['text','interactive','button'].includes(String(last.kind)))handoff='Adjunto recibido: revisión del equipo';
-  if(!handoff){try{q=await extract(c,history);}catch(e){await transfer(c.id,(e as Error).message);return;}}
+  if(!handoff&&!socialReply){try{q=await extract(c,history);}catch(e){await transfer(c.id,(e as Error).message);return;}}
   if(q.intent==='opt_out'){await stopContact(c.id);await event(c.id,'optout','Solicitud de baja identificada en la conversación');return;}
   handoff=handoff||handoffReason(q,String(last.text));
-  if(!handoff&&q.confidence<.65)handoff='Consulta ambigua: necesita un closer';
-  const rating=qualify(q,!!c.verified_returning);let reply='',productImage:string|null=null;
-  if(handoff){reply=q.intent==='warranty'?'Te paso con oficina para revisar la garantía y ayudarte con el equipo.':q.intent==='payment'||/se[ñn]a|transfer[ií]|comprobante/i.test(String(last.text))?'Recibí tu aviso. Administración va a verificar el ingreso del dinero antes de confirmar el pago o la reserva.':'Te paso con el equipo para revisar esto y ayudarte.';}
-  else if(q.topic==='hours')reply='Atendemos con turno en Neuquén capital. Lunes, miércoles, viernes y sábados de 11 a 18; martes, jueves y domingos de 13 a 20. Por acá puedo ayudarte las 24 horas. ¿Querés que veamos un turno de 15 minutos?';
+  if(!handoff&&!socialReply&&q.confidence<.65)handoff='Consulta ambigua: necesita un closer';
+  const rating=qualify(q,!!c.verified_returning);let reply=socialReply||'',productImage:string|null=null;
+  if(handoff){reply=handoffReply(q,String(last.text),String(last.kind));}
+  else if(reply){/* Un saludo o agradecimiento no vuelve a disparar la venta anterior. */}
+  else if(q.topic==='hours')reply=responseCopy.hours;
   else if(q.topic==='location'){if(s.storeAddress)reply=`Estamos en ${s.storeAddress}, Neuquén capital. La atención es con turno de 15 minutos. ¿Qué día te queda cómodo?`;else{handoff='Confirmar dirección del local';reply='Estamos en Neuquén capital y atendemos con turno. Te paso con el equipo para compartirte la ubicación exacta.';}}
-  else if(q.topic==='payment_options')reply='Aceptamos pesos, USD, transferencia y tarjeta de crédito hasta en 12 cuotas con interés. Para decirte el valor de cada cuota, ¿qué modelo te interesa?';
-  else if(q.topic==='returns'){handoff='Condiciones de cambio o devolución';reply='Te paso con administración para revisar las condiciones y ayudarte con tu caso.';}
+  else if(q.topic==='payment_options')reply=responseCopy.paymentOptions;
+  else if(q.topic==='returns'){handoff='Condiciones de cambio o devolución';reply=responseCopy.returns;}
   else if(q.intent==='appointment'){
     if(!c.owner_id){handoff='No hay un closer activo para asignar el turno';reply='Recibí tu pedido de turno. El equipo va a coordinar el horario con vos.';}
     else if(q.appointmentAt){
@@ -47,10 +50,10 @@ export async function processJob(job:any){
     if(q.intent==='trade_in'||q.tradeModel){const trade=tradeValue(q,s);if(trade.manual){handoff='Canje para revisión de oficina';reply='Para cotizar ese canje correctamente necesito que lo revise oficina. Te paso con el equipo.';}else if(trade.question)tradeQuestion=trade.question;else tradeCredit=trade.value||0;}
     if(!handoff){
       if(tradeQuestion)reply=tradeQuestion;
-      else if(!q.product)reply=q.tradeModel?`El canje se estima en ${money(tradeCredit)}, sujeto a revisión física. ¿Qué modelo te gustaría llevar?`:'Hola, soy el asistente virtual de iPhone Culture. ¿Qué equipo estás buscando?';
+      else if(!q.product)reply=q.tradeModel?`${tradeEstimateReply(money(tradeCredit))} ${responseCopy.askProduct}`:responseCopy.firstProductQuestion;
       else{
         const available=await stockAvailable();const matches=matchingStock(available,q.product);
-        if(!matches.length){const alternatives=available.filter(x=>Number(x.available)>0&&(!q.budgetUsd||Number(x.precio_venta_usd)<=q.budgetUsd)).slice(0,3);reply=`No veo ${q.product} disponible en este momento.`+(alternatives.length?' Tenemos '+alternatives.map(x=>`${x.modelo} ${x.capacidad||''}`).join(', ')+'. ¿Querés que te cotice alguno?':' Te paso con el equipo para consultar una alternativa.');if(!alternatives.length)handoff='Sin stock para la consulta';}
+        if(!matches.length){const alternatives=available.filter(x=>Number(x.available)>0&&(!q.budgetUsd||Number(x.precio_venta_usd)<=q.budgetUsd)).slice(0,3);const firstContact=history.filter(m=>m.direction==='in').length===1;reply=outOfStockReply(q.product,alternatives,firstContact);if(!alternatives.length)handoff='Sin stock para la consulta';}
         else if(matches.length>1){reply='Para ese modelo tengo estas opciones: '+matches.slice(0,4).map(x=>`${x.modelo} ${x.capacidad||''} ${x.color||''} (${x.condicion||'estado a confirmar'})`).join(' · ')+'. ¿Cuál preferís?';}
         else{const estimate=await quote(c.id,Number(matches[0].id),q.priceObjection,tradeCredit,q);reply=quoteText(estimate)+(q.timeframe==='later'&&!c.followup_optin?' ¿Me autorizás a escribirte por acá en 48 horas para retomar esta consulta?':q.payment?' ¿Querés que veamos un turno para que lo conozcas?':' ¿Preferís abonar al contado o en cuotas?');if(wantsProductImage(String(last.text))){if(matches[0].image_url)productImage=String(matches[0].image_url);else reply+=' Todavía no tenemos una foto cargada de esta unidad.';}}
       }

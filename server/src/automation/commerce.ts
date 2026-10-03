@@ -54,15 +54,16 @@ export async function quote(id:number,stockId:number,applyDiscount=false, tradeC
   return {id:Number(r.lastInsertRowid),...detail,expiresAt:expires};
 }
 export function quoteText(q:any):string {
-  let text=`Tenemos ${q.product}${q.condition?` (${q.condition})`:''}. Precio: ${money(q.baseUsd)}.`;
-  if(q.discountUsd)text+=` Con el beneficio aplicado queda en ${money(q.baseUsd-q.discountUsd)}.`;
-  if(q.tradeCreditUsd)text+=` El canje se estima en ${money(q.tradeCreditUsd)}, sujeto a revisión física. Diferencia estimada: ${money(q.totalUsd)}.`;
-  text+=` En pesos: ${pesos(q.totalArs)} al cambio de ${q.fx}.`;
-  if(q.finance)text+=` En ${q.finance.cuotas} cuotas con interés: ${pesos(q.finance.cuotaArs)} por cuota; total ${pesos(q.finance.totalArs)}.`;
-  if(q.battery!=null)text+=` Batería: ${q.battery}%.`;
-  if(q.repairs)text+=` Reparaciones informadas: ${String(q.repairs).slice(0,250)}.`;
-  if(q.warrantyMonths)text+=` Garantía comercial: ${q.warrantyMonths} meses.`;
-  return text+' La cotización vale 15 minutos y está sujeta a disponibilidad hasta confirmar la seña.';
+  const lines=[`Tenemos disponible ${q.product}${q.condition?` (${q.condition})`:''}.`,`Precio: ${money(q.baseUsd)}.`];
+  if(q.discountUsd)lines.push(`Con el beneficio aplicado: ${money(q.baseUsd-q.discountUsd)}.`);
+  if(q.tradeCreditUsd)lines.push(`Canje estimado: ${money(q.tradeCreditUsd)}, sujeto a revisión física.`,`Diferencia estimada: ${money(q.totalUsd)}.`);
+  lines.push(`En pesos: ${pesos(q.totalArs)} (USD a ${q.fx}).`);
+  if(q.finance)lines.push(`${q.finance.cuotas} cuotas con interés de ${pesos(q.finance.cuotaArs)}; total financiado ${pesos(q.finance.totalArs)}.`);
+  if(q.battery!=null)lines.push(`Batería: ${q.battery}%.`);
+  if(q.repairs)lines.push(`Reparaciones informadas: ${String(q.repairs).slice(0,250)}.`);
+  if(q.warrantyMonths)lines.push(`Garantía comercial: ${q.warrantyMonths} meses.`);
+  lines.push('La cotización vale 15 minutos. El stock se confirma al acreditar la seña.');
+  return lines.join('\n');
 }
 export async function createReservation(conversationId:number,quoteId:number) {
   const c=await conversation(conversationId);

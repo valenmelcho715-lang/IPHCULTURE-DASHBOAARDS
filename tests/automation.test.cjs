@@ -14,6 +14,7 @@ const commerce=require('../server/dist/automation/commerce');
 const {processJob}=require('../server/dist/automation/engine');
 const {maintenance,deliver,recoverStalled,alertSilentHighIntent}=require('../server/dist/automation/worker');
 const intelligence=require('../server/dist/automation/intelligence');
+const responseCopy=require('../server/dist/automation/response-copy');
 const {metaRouter,validSignature,sendMeta}=require('../server/dist/automation/meta');
 const {signToken}=require('../server/dist/auth');
 const express=require('express');let server,base,users={},stockId;
@@ -102,6 +103,16 @@ test('Respuesta automática cotiza desde Stock y deja trazabilidad',async()=>{
   const c=await repo.conversation(r.id);assert.equal(c.score,75);assert.equal(c.mode,'auto');
   const out=(await db.execute({sql:"SELECT text,delivery FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0];assert.match(out.text,/USD 600/);assert.equal(out.delivery,'preview');
   assert.equal(Number((await db.execute({sql:'SELECT COUNT(*) AS n FROM crm_quotes WHERE conversation_id=?',args:[r.id]})).rows[0].n),1);
+});
+test('El tono social es breve y no confunde un agradecimiento con otra compra',async()=>{
+  assert.match(responseCopy.courtesyReply('Hola!!'),/asistente virtual/);
+  assert.match(responseCopy.courtesyReply('Muchas gracias.'),/De nada/);
+  assert.equal(responseCopy.courtesyReply('Gracias, quiero un iPhone 13'),null);
+  const externalId=crypto.randomUUID();
+  const first=await input('Quiero un iPhone 13 en efectivo',{externalId});await processInput(first);
+  const thanks=await input('Muchas gracias',{externalId});await processInput(thanks);
+  const messages=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out' ORDER BY id",args:[first.id]})).rows;
+  assert.equal(messages.length,2);assert.match(messages[1].text,/De nada/);assert.doesNotMatch(messages[1].text,/USD|cotizaci[oó]n/i);
 });
 test('Una foto del stock solo se prepara cuando el cliente la pide',async()=>{
   await db.execute({sql:'UPDATE stock SET image_url=? WHERE id=?',args:['https://cdn.example.test/iphone-13.jpg',stockId]});
