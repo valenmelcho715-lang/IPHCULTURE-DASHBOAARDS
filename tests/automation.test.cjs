@@ -64,6 +64,13 @@ test('Canje exige batería y revisión de estado; respeta la deducción Android 
   assert.equal(commerce.tradeValue({...q,tradeBrand:'Samsung',tradeModel:'Galaxy S23',tradeStorage:'256 GB',tradeCondition:'Detalles leves'},s).value,215);
   assert.equal(commerce.tradeValue({...q,tradeRepaired:true},s).manual,true);
 });
+test('Canje pide juntos los datos faltantes y no interroga mensaje por mensaje',async()=>{
+  const s=await settings();
+  const question=commerce.tradeValue({...domain.EMPTY_QUALIFICATION,tradeBrand:'iPhone',tradeModel:'iPhone 13'},s).question;
+  assert.match(question,/Para poder cotizar tu equipo/);assert.match(question,/Capacidad \(GB\)/);assert.match(question,/Porcentaje de batería/);assert.match(question,/detalle estético, falla interna o reparación/);
+  const android=commerce.tradeValue({...domain.EMPTY_QUALIFICATION,tradeBrand:'Samsung',tradeModel:'Galaxy S23'},s).question;
+  assert.doesNotMatch(android,/batería/);assert.match(android,/Capacidad \(GB\)/);
+});
 test('El puntaje usa datos de compra y no castiga la demora al responder',()=>{
   const q={...domain.EMPTY_QUALIFICATION,product:'iPhone 13',budgetUsd:600,payment:'Efectivo',timeframe:'today'};
   assert.equal(domain.qualify(q).score,75);assert.ok(domain.qualify(q).reasons.includes('Quiere comprar hoy'));

@@ -34,6 +34,16 @@
 
 La palabra “promos” se usa únicamente cuando exista una promoción vigente y verificable cargada en el sistema. Si no, se ofrecen “opciones” para evitar prometer un descuento inexistente.
 
+**Datos para cotizar un canje**
+
+> Para poder cotizar tu equipo necesito que me pases:
+> • Modelo exacto
+> • Capacidad (GB)
+> • Porcentaje de batería
+> • Si tiene algún detalle estético, falla interna o reparación
+
+Se piden juntos todos los datos que falten para evitar un interrogatorio mensaje por mensaje. En Android no se solicita porcentaje de batería.
+
 **Comprobante o transferencia**
 
 > ¡Gracias por avisar! Administración va a verificar el ingreso antes de confirmar el pago o la reserva. Te responden por acá.
