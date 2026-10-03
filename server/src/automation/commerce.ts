@@ -53,7 +53,8 @@ export async function quote(id:number,stockId:number,applyDiscount=false, tradeC
   if(Number(item.precio_venta_usd)<=0)throw new BusinessError('El precio de Stock necesita revisión');
   const discount=discountFor(s,!!c.verified_returning,applyDiscount);
   const total=round2(Math.max(0,Number(item.precio_venta_usd)-discount-tradeCredit));
-  const detail:any={opportunityId:c.opportunity_id,stockId,product:`${item.modelo} ${item.capacidad||''} ${item.color||''}`.trim(),condition:item.condicion,baseUsd:Number(item.precio_venta_usd),discountUsd:discount,tradeCreditUsd:tradeCredit,totalUsd:total,fx:s.usdArs,totalArs:round2(total*s.usdArs),battery:item.battery_pct,repairs:item.repairs,warrantyMonths:item.warranty_months,source:'stock',provisionalTrade:tradeCredit>0};
+  const discountReason=!discount?null:c.verified_returning?(applyDiscount&&s.stackReturningDiscount?'returning_and_price':'returning'):applyDiscount?'best_price':null;
+  const detail:any={opportunityId:c.opportunity_id,stockId,product:`${item.modelo} ${item.capacidad||''} ${item.color||''}`.trim(),condition:item.condicion,baseUsd:Number(item.precio_venta_usd),discountUsd:discount,discountReason,tradeCreditUsd:tradeCredit,totalUsd:total,fx:s.usdArs,totalArs:round2(total*s.usdArs),battery:item.battery_pct,repairs:item.repairs,warrantyMonths:item.warranty_months,source:'stock',provisionalTrade:tradeCredit>0};
   const requested=qualification||c.qualification;
   if(requested.installments){const fees=(await db.execute({sql:'SELECT * FROM cuotas_fees WHERE cuotas=?',args:[requested.installments]})).rows[0];if(fees)detail.finance=finance(total,s.usdArs,fees);}
   const expires=new Date(Date.now()+15*60_000).toISOString();
@@ -62,7 +63,13 @@ export async function quote(id:number,stockId:number,applyDiscount=false, tradeC
 }
 export function quoteText(q:any):string {
   const lines=[`Tenemos disponible ${q.product}${q.condition?` (${q.condition})`:''}.`,`Precio: ${money(q.baseUsd)}.`];
-  if(q.discountUsd)lines.push(`Con el beneficio aplicado: ${money(q.baseUsd-q.discountUsd)}.`);
+  if(q.discountUsd){
+    if(q.discountReason==='best_price'){
+      if(q.tradeCreditUsd)lines.push('Mirá, tomamos tu equipo en ese valor porque después tenemos que revisarlo y revenderlo, y a veces puede quedar un tiempo en stock.');
+      lines.push(`Como mejor precio, te puedo descontar ${money(q.discountUsd)}.`);
+    }else if(q.discountReason==='returning_and_price')lines.push(`Por tu recompra y el mejor precio autorizado, te descontamos ${money(q.discountUsd)}.`);
+    else lines.push(`Por tu recompra, tenés un beneficio de ${money(q.discountUsd)}.`);
+  }
   if(q.tradeCreditUsd)lines.push(tradeEstimateReply(money(q.tradeCreditUsd)),`Descontando el canje, la diferencia por el equipo que querés es de ${money(q.totalUsd)}.`);
   lines.push(`En pesos: ${pesos(q.totalArs)} (USD a ${q.fx}).`);
   if(q.finance)lines.push(`${q.finance.cuotas} cuotas con interés de ${pesos(q.finance.cuotaArs)}; total financiado ${pesos(q.finance.totalArs)}.`);

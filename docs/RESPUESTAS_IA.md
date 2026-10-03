@@ -50,6 +50,12 @@ Se piden juntos todos los datos que falten para evitar un interrogatorio mensaje
 
 Se usa “tomaríamos” porque el valor final depende de la revisión física. El sistema resta automáticamente el canje del equipo elegido y nunca calcula la diferencia de memoria.
 
+**Objeción por el valor del canje**
+
+> Mirá, tomamos tu equipo en ese valor porque después tenemos que revisarlo y revenderlo, y a veces puede quedar un tiempo en stock. Como mejor precio, te puedo descontar USD 15.
+
+El descuento general máximo confirmado es USD 15. Se descuenta del equipo que compra la persona; no se altera artificialmente la valuación registrada del canje.
+
 **Comprobante o transferencia**
 
 > ¡Gracias por avisar! Administración va a verificar el ingreso antes de confirmar el pago o la reserva. Te responden por acá.

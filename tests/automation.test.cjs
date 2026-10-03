@@ -55,8 +55,8 @@ test('Cuotas reproducen el PDF comercial y la cotización indicada por el dueño
   const fees=(await db.execute('SELECT * FROM cuotas_fees WHERE cuotas=12')).rows[0];
   assert.deepEqual(domain.finance(1000,1680,fees),{cuotas:12,totalArs:2792990.14,cuotaArs:232749.18,fx:1680});
 });
-test('Beneficios: 20 general, 30 recompra, 50 solo cuando se configura acumulación',async()=>{
-  const s=await settings();assert.equal(domain.discountFor(s,false,true),20);assert.equal(domain.discountFor(s,true,true),30);assert.equal(domain.discountFor({...s,stackReturningDiscount:true},true,true),50);
+test('Beneficios: 15 general, 30 recompra, 45 solo cuando se configura acumulación',async()=>{
+  const s=await settings();assert.equal(domain.discountFor(s,false,true),15);assert.equal(domain.discountFor(s,true,true),30);assert.equal(domain.discountFor({...s,stackReturningDiscount:true},true,true),45);
 });
 test('Canje exige batería y revisión de estado; respeta la deducción Android vigente',async()=>{
   const s=await settings();const q={...domain.EMPTY_QUALIFICATION,tradeBrand:'iPhone',tradeModel:'iPhone 13',tradeStorage:'Base',tradeCondition:'Excelente',tradeRepaired:false,tradeInternalOk:true};
@@ -76,6 +76,10 @@ test('La respuesta de canje muestra la toma y resta la diferencia calculada',()=
   assert.match(text,/Genial, según el sistema tomaríamos tu equipo en USD 150/);
   assert.match(text,/Descontando el canje, la diferencia por el equipo que querés es de USD 750/);
   assert.match(text,/sujeto a revisión física/);
+});
+test('La objeción del canje explica el riesgo y ofrece como máximo USD 15',()=>{
+  const text=commerce.quoteText({product:'iPhone 15',condition:'Nuevo',baseUsd:900,discountUsd:15,discountReason:'best_price',tradeCreditUsd:150,totalUsd:735,totalArs:1234800,fx:1680});
+  assert.match(text,/tenemos que revisarlo y revenderlo/);assert.match(text,/mejor precio, te puedo descontar USD 15/);assert.match(text,/diferencia.*USD 735/);
 });
 test('El puntaje usa datos de compra y no castiga la demora al responder',()=>{
   const q={...domain.EMPTY_QUALIFICATION,product:'iPhone 13',budgetUsd:600,payment:'Efectivo',timeframe:'today'};

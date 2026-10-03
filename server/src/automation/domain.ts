@@ -9,7 +9,7 @@ export interface Settings {
   closerIds: number[]; timezone: string; storeAddress:string;
 }
 export const DEFAULT_SETTINGS: Settings = {
-  enabled: false, usdArs: 1680, maxDiscountUsd: 20, returningDiscountUsd: 30,
+  enabled: false, usdArs: 1680, maxDiscountUsd: 15, returningDiscountUsd: 30,
   stackReturningDiscount: false, androidDeductionUsd: 215, reservationPercent: 30,
   reservationDays: 7, followupHours: [48, 96, 168, 240, 336], maxFollowups: 5,
   aiMonthlyBudgetUsd: 100, aiInputUsdPerMillion: 0.4, aiOutputUsdPerMillion: 1.6,
