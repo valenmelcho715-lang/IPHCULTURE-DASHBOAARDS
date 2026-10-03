@@ -28,6 +28,12 @@
 
 > ¡De nada! Cuando quieras, seguimos por acá.
 
+**Producto sin stock**
+
+> ¡Hola! ¿Cómo va? Gracias por escribirnos. No nos quedó el iPhone 15 Pro en stock, pero tengo algunas opciones que quizás te sirvan: [opciones reales de Stock]. ¿Querés que te cuente más?
+
+La palabra “promos” se usa únicamente cuando exista una promoción vigente y verificable cargada en el sistema. Si no, se ofrecen “opciones” para evitar prometer un descuento inexistente.
+
 **Comprobante o transferencia**
 
 > ¡Gracias por avisar! Administración va a verificar el ingreso antes de confirmar el pago o la reserva. Te responden por acá.

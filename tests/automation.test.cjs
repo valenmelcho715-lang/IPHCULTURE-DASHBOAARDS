@@ -114,6 +114,14 @@ test('El tono social es breve y no confunde un agradecimiento con otra compra',a
   const messages=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out' ORDER BY id",args:[first.id]})).rows;
   assert.equal(messages.length,2);assert.match(messages[1].text,/De nada/);assert.doesNotMatch(messages[1].text,/USD|cotizaci[oó]n/i);
 });
+test('Cuando no hay stock responde con el tono del negocio y solo ofrece opciones reales',async()=>{
+  const r=await input('¿Tienen iPhone 15 Pro?');await processInput(r);
+  const out=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0];
+  assert.match(out.text,/¡Hola! ¿Cómo va\? Gracias por escribirnos/);
+  assert.match(out.text,/No nos quedó iPhone 15 Pro en stock/);
+  assert.match(out.text,/iPhone 13 128GB/);
+  assert.doesNotMatch(out.text,/promo/i);
+});
 test('Una foto del stock solo se prepara cuando el cliente la pide',async()=>{
   await db.execute({sql:'UPDATE stock SET image_url=? WHERE id=?',args:['https://cdn.example.test/iphone-13.jpg',stockId]});
   const requested=await input('Quiero una foto del iPhone 13');await processInput(requested);

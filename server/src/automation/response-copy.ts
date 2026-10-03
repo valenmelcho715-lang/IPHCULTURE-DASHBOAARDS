@@ -43,3 +43,11 @@ export const responseCopy={
   askProduct:'¿Qué modelo te gustaría llevar?',
   firstProductQuestion:'¡Hola! Soy el asistente virtual de iPhone Culture. Contame qué equipo estás buscando y te ayudo.',
 };
+
+export function outOfStockReply(product:string,alternatives:Array<{modelo?:unknown;capacidad?:unknown}>,firstContact:boolean):string {
+  const hello=firstContact?'¡Hola! ¿Cómo va? Gracias por escribirnos. ':'';
+  const unavailable=`No nos quedó ${product} en stock`;
+  if(!alternatives.length)return `${hello}${unavailable}. Si querés, te paso con el equipo para buscar una alternativa.`;
+  const options=alternatives.map(item=>`${String(item.modelo||'').trim()} ${String(item.capacidad||'').trim()}`.trim()).join(', ');
+  return `${hello}${unavailable}, pero tengo algunas opciones que quizás te sirvan: ${options}. ¿Querés que te cuente más?`;
+}
