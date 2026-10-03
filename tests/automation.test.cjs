@@ -130,6 +130,14 @@ test('El tono social es breve y no confunde un agradecimiento con otra compra',a
   const messages=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out' ORDER BY id",args:[first.id]})).rows;
   assert.equal(messages.length,2);assert.match(messages[1].text,/De nada/);assert.doesNotMatch(messages[1].text,/USD|cotizaci[oó]n/i);
 });
+test('Cuando no hay stock responde con el tono del negocio y solo ofrece opciones reales',async()=>{
+  const r=await input('¿Tienen iPhone 15 Pro?');await processInput(r);
+  const out=(await db.execute({sql:"SELECT text FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[r.id]})).rows[0];
+  assert.match(out.text,/¡Hola! ¿Cómo va\? Gracias por escribirnos/);
+  assert.match(out.text,/No nos quedó iPhone 15 Pro en stock/);
+  assert.match(out.text,/iPhone 13 128GB/);
+  assert.doesNotMatch(out.text,/promo/i);
+});
 test('Mensajes consecutivos cancelan el trabajo obsoleto y no duplican respuesta',async()=>{
   const externalId=crypto.randomUUID();const a=await input('Hola',{externalId});const b=await input('Quiero un iPhone 13 en efectivo',{externalId});await processInput(a);await processInput(b);await processInput(b);
   assert.equal(Number((await db.execute({sql:"SELECT COUNT(*) AS n FROM crm_messages WHERE conversation_id=? AND direction='out'",args:[b.id]})).rows[0].n),1);

@@ -5,7 +5,7 @@ import {settings,event,notifyTeam} from './schema';
 import {conversation,enqueueReply,transfer,nowIso,stopContact} from './repository';
 import {qualify,handoffReason,normalizePhone,EMPTY_QUALIFICATION,optedOut,windowOpen} from './domain';
 import {stockAvailable,matchingStock,tradeValue,quote,quoteText,slots,bookAppointment,money} from './commerce';
-import {courtesyReply,handoffReply,responseCopy} from './response-copy';
+import {courtesyReply,handoffReply,outOfStockReply,responseCopy} from './response-copy';
 export async function processJob(job:any){
   let c=await conversation(Number(job.conversation_id));
   const latest=(await db.execute({sql:"SELECT id FROM crm_messages WHERE conversation_id=? AND direction='in' AND processable=1 ORDER BY id DESC LIMIT 1",args:[c.id]})).rows[0];
@@ -52,7 +52,7 @@ export async function processJob(job:any){
       else if(!q.product)reply=q.tradeModel?`El canje se estima en ${money(tradeCredit)}, sujeto a revisión física. ${responseCopy.askProduct}`:responseCopy.firstProductQuestion;
       else{
         const available=await stockAvailable();const matches=matchingStock(available,q.product);
-        if(!matches.length){const alternatives=available.filter(x=>Number(x.available)>0&&(!q.budgetUsd||Number(x.precio_venta_usd)<=q.budgetUsd)).slice(0,3);reply=`No veo ${q.product} disponible en este momento.`+(alternatives.length?' Tenemos '+alternatives.map(x=>`${x.modelo} ${x.capacidad||''}`).join(', ')+'. ¿Querés que te cotice alguno?':' Te paso con el equipo para consultar una alternativa.');if(!alternatives.length)handoff='Sin stock para la consulta';}
+        if(!matches.length){const alternatives=available.filter(x=>Number(x.available)>0&&(!q.budgetUsd||Number(x.precio_venta_usd)<=q.budgetUsd)).slice(0,3);const firstContact=history.filter(m=>m.direction==='in').length===1;reply=outOfStockReply(q.product,alternatives,firstContact);if(!alternatives.length)handoff='Sin stock para la consulta';}
         else if(matches.length>1){reply='Para ese modelo tengo estas opciones: '+matches.slice(0,4).map(x=>`${x.modelo} ${x.capacidad||''} ${x.color||''} (${x.condicion||'estado a confirmar'})`).join(' · ')+'. ¿Cuál preferís?';}
         else{const estimate=await quote(c.id,Number(matches[0].id),q.priceObjection,tradeCredit,q);reply=quoteText(estimate)+(q.timeframe==='later'&&!c.followup_optin?' ¿Me autorizás a escribirte por acá en 48 horas para retomar esta consulta?':q.payment?' ¿Querés que veamos un turno para que lo conozcas?':' ¿Preferís abonar al contado o en cuotas?');}
       }
