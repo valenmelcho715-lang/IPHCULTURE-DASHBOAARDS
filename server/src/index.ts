@@ -33,6 +33,7 @@ import extrasRoutes from './routes/extras';
 import pushRoutes from './routes/push';
 import chatRoutes from './routes/chat';
 import mejorasRoutes, { logActividad } from './routes/mejoras';
+import metaOnboardingRoutes from './routes/metaOnboarding';
 
 const app = express();
 app.use(compression());
@@ -73,6 +74,7 @@ app.use('/api/facturas', facturasRoutes);
 app.use('/api/turnos', turnosRoutes);
 app.use('/api/cuotero', cuoteroRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/meta-onboarding', metaOnboardingRoutes);
 app.use('/api/noticias', noticiasRoutes);
 app.use('/api/mensajes', mensajesRoutes);
 app.use('/api/fichajes', fichajesRoutes);

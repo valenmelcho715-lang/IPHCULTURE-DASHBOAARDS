@@ -22,6 +22,7 @@ import Bonos from './pages/Bonos';
 import Admin from './pages/Admin';
 import Reportes from './pages/Reportes';
 import ComprobantePublico from './pages/ComprobantePublico';
+import WhatsAppSetup from './pages/WhatsAppSetup';
 import { ReactNode } from 'react';
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Array<'admin' | 'oficina' | 'closer'> }) {
@@ -69,6 +70,14 @@ export default function App() {
           element={
             <Protected roles={['admin', 'oficina']}>
               <Admin />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/whatsapp"
+          element={
+            <Protected roles={['admin']}>
+              <WhatsAppSetup />
             </Protected>
           }
         />

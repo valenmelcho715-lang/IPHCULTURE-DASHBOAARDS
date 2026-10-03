@@ -15,6 +15,14 @@ export function connectionStatus(){return {
   model:process.env.OPENAI_MODEL||'gpt-4.1-mini',demo:process.env.AUTO_AI_PROVIDER==='demo',
 };}
 export const metaRouter=Router();
+async function configuredWhatsAppPhoneId():Promise<string|undefined>{
+  try{
+    const r=await db.execute("SELECT phone_number_id FROM meta_connection WHERE id=1");
+    const value=String((r.rows[0] as any)?.phone_number_id||'');
+    if(/^\d+$/.test(value))return value;
+  }catch{}
+  return process.env.WHATSAPP_PHONE_NUMBER_ID;
+}
 metaRouter.get('/',(req,res)=>{
   const token=process.env.META_VERIFY_TOKEN;
   if(token&&req.query['hub.mode']==='subscribe'&&req.query['hub.verify_token']===token){res.type('text').send(String(req.query['hub.challenge']||''));return;}
@@ -26,9 +34,11 @@ metaRouter.post('/',async(req,res)=>{
   try{
     const body=req.body;
     if(body.object==='whatsapp_business_account'){
-      if(!process.env.WHATSAPP_PHONE_NUMBER_ID){res.sendStatus(503);return;}
+      const configuredPhoneId=await configuredWhatsAppPhoneId();
+      if(!configuredPhoneId){res.sendStatus(503);return;}
       for(const entry of body.entry||[])for(const change of entry.changes||[]){
-        const v=change.value||{};if(String(v.metadata?.phone_number_id)!==process.env.WHATSAPP_PHONE_NUMBER_ID)continue;
+        if(change.field&&change.field!=='messages')continue;
+        const v=change.value||{};if(String(v.metadata?.phone_number_id)!==configuredPhoneId)continue;
         for(const m of v.messages||[]){
           if(!m.id||!m.from)continue;
           const content=m.text?.body||m.interactive?.button_reply?.title||m.interactive?.list_reply?.title||m.button?.text||m.image?.caption||m.document?.caption||`[${String(m.type||'adjunto')}: requiere revisión]`;
@@ -67,7 +77,7 @@ export async function sendMeta(c:any,text:string,kind:string,template?:{name:str
   if(!version||!/^v\d+\.\d+$/.test(version))throw new DeliveryError('Falta configurar la versión de Meta');
   let url:string,token:string|undefined,body:any;
   if(c.channel==='whatsapp'){
-    token=process.env.WHATSAPP_ACCESS_TOKEN;const phone=process.env.WHATSAPP_PHONE_NUMBER_ID;
+    token=process.env.WHATSAPP_ACCESS_TOKEN;const phone=await configuredWhatsAppPhoneId();
     if(!token||!phone)throw new DeliveryError('WhatsApp no está conectado');
     url=`https://graph.facebook.com/${version}/${phone}/messages`;
     body=kind==='template'?{messaging_product:'whatsapp',to:c.external_id,type:'template',template:{name:template?.name,language:{code:template?.language}}}:{messaging_product:'whatsapp',to:c.external_id,type:'text',text:{body:text,preview_url:false}};

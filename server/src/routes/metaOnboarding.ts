@@ -1,0 +1,140 @@
+import { Router, Response } from 'express';
+import { authRequired, requireRole, AuthRequest } from '../auth';
+import { db } from '../db';
+
+const router = Router();
+router.use(authRequired, requireRole('admin'));
+
+type SignupSession = {
+  type?: unknown;
+  event?: unknown;
+  data?: { waba_id?: unknown };
+};
+
+const digits = (value: unknown): string | null => {
+  const text = String(value ?? '');
+  return /^\d{5,30}$/.test(text) ? text : null;
+};
+
+async function graphRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  const version = process.env.META_GRAPH_VERSION || 'v26.0';
+  const response = await fetch(`https://graph.facebook.com/${version}/${path}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${token}`, ...(init?.headers || {}) },
+    signal: AbortSignal.timeout(20_000),
+  });
+  const body = (await response.json().catch(() => ({}))) as T & { error?: { message?: string } };
+  if (!response.ok) throw new Error(body.error?.message || `Meta respondió HTTP ${response.status}`);
+  return body;
+}
+
+router.get('/config', (_req: AuthRequest, res: Response) => {
+  const appId = process.env.META_APP_ID || '';
+  const configurationId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID || '';
+  res.json({
+    ready: Boolean(appId && configurationId && process.env.META_APP_SECRET),
+    appId,
+    configurationId,
+    graphVersion: process.env.META_GRAPH_VERSION || 'v26.0',
+    coexistence: true,
+    liveMessages: process.env.ALLOW_LIVE_MESSAGES === 'true',
+  });
+});
+
+router.post('/complete', async (req: AuthRequest, res: Response) => {
+  try {
+    if (process.env.ALLOW_LIVE_MESSAGES === 'true') {
+      return res.status(409).json({ error: 'Desactivá los mensajes automáticos antes de conectar el número' });
+    }
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    const session = (req.body?.session || {}) as SignupSession;
+    const wabaId = digits(session.data?.waba_id);
+    if (!code || code.length > 4096) return res.status(400).json({ error: 'Código de autorización inválido' });
+    if (session.type !== 'WA_EMBEDDED_SIGNUP' || session.event !== 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING' || !wabaId) {
+      return res.status(400).json({ error: 'El alta no confirmó el modo coexistencia' });
+    }
+
+    const appId = process.env.META_APP_ID || '';
+    const appSecret = process.env.META_APP_SECRET || '';
+    if (!appId || !appSecret) return res.status(503).json({ error: 'Falta completar la configuración segura de Meta' });
+
+    const version = process.env.META_GRAPH_VERSION || 'v26.0';
+    const exchangeUrl = new URL(`https://graph.facebook.com/${version}/oauth/access_token`);
+    exchangeUrl.searchParams.set('client_id', appId);
+    exchangeUrl.searchParams.set('client_secret', appSecret);
+    exchangeUrl.searchParams.set('code', code);
+    const exchange = await fetch(exchangeUrl, { signal: AbortSignal.timeout(20_000) });
+    const exchangeBody = (await exchange.json().catch(() => ({}))) as { access_token?: string; error?: { message?: string } };
+    if (!exchange.ok || !exchangeBody.access_token) {
+      throw new Error(exchangeBody.error?.message || 'Meta no pudo intercambiar el código de autorización');
+    }
+    const businessToken = exchangeBody.access_token;
+
+    await graphRequest(`${wabaId}/subscribed_apps`, businessToken, { method: 'POST' });
+    const phones = await graphRequest<{ data?: Array<{ id?: string; display_phone_number?: string }> }>(
+      `${wabaId}/phone_numbers?fields=id,display_phone_number,is_on_biz_app,platform_type`,
+      businessToken
+    );
+    const phone = phones.data?.find((item) => digits(item.id));
+    const phoneNumberId = digits(phone?.id);
+    if (!phoneNumberId) throw new Error('Meta no devolvió el identificador del número conectado');
+
+    const sync: Record<string, boolean> = { contacts: false, history: false };
+    for (const [key, syncType] of [['contacts', 'smb_app_state_sync'], ['history', 'history']] as const) {
+      try {
+        await graphRequest(`${phoneNumberId}/smb_app_data`, businessToken, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', sync_type: syncType }),
+        });
+        sync[key] = true;
+      } catch {
+        // La persona puede elegir no compartir el historial; no invalida la coexistencia.
+      }
+    }
+
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS meta_connection (
+        id INTEGER PRIMARY KEY CHECK(id=1),
+        waba_id TEXT NOT NULL,
+        phone_number_id TEXT NOT NULL,
+        business_id TEXT,
+        coexistence INTEGER NOT NULL DEFAULT 1,
+        connected_at TEXT NOT NULL
+      )
+    `);
+    await db.execute({
+      sql: `INSERT INTO meta_connection(id,waba_id,phone_number_id,business_id,coexistence,connected_at)
+            VALUES(1,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET waba_id=excluded.waba_id,phone_number_id=excluded.phone_number_id,
+              business_id=excluded.business_id,coexistence=1,connected_at=excluded.connected_at`,
+      args: [wabaId, phoneNumberId, null, 1, new Date().toISOString()],
+    });
+
+    let permanentTokenReady = false;
+    const permanentToken = process.env.WHATSAPP_ACCESS_TOKEN;
+    if (permanentToken) {
+      try {
+        await graphRequest(`${phoneNumberId}?fields=id`, permanentToken);
+        permanentTokenReady = true;
+      } catch {
+        permanentTokenReady = false;
+      }
+    }
+
+    res.json({
+      ok: true,
+      coexistence: true,
+      phoneNumberId,
+      wabaId,
+      sync,
+      permanentTokenReady,
+      liveMessages: false,
+    });
+  } catch (error) {
+    console.error('[meta-onboarding]', error);
+    res.status(502).json({ error: error instanceof Error ? error.message : 'No se pudo completar la conexión con Meta' });
+  }
+});
+
+export default router;

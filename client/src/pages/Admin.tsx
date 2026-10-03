@@ -6,6 +6,7 @@
 // deshabilitado con tooltip "Solo lectura".
 // ============================================================
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Trash2, Check, Send, BarChart3, X, Trophy, Target, Activity, Download } from 'lucide-react';
 import { api, fmtUSD, fmtFecha, getToken } from '../lib/api';
@@ -158,7 +159,16 @@ export default function Admin() {
       <PageHeader
         title="Administración"
         subtitle={readOnly ? 'Modo solo lectura (oficina)' : 'Gestión completa del negocio'}
-        actions={readOnly ? <Badge color="violet">Solo lectura</Badge> : <Badge color="amber">Admin</Badge>}
+        actions={
+          readOnly ? <Badge color="violet">Solo lectura</Badge> : (
+            <div className="flex items-center gap-2">
+              <Link to="/admin/whatsapp" className="px-3 py-2 rounded-xl text-sm font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 hover:border-emerald-300/60">
+                Conectar WhatsApp
+              </Link>
+              <Badge color="amber">Admin</Badge>
+            </div>
+          )
+        }
       />
 
       {/* Tabs */}
