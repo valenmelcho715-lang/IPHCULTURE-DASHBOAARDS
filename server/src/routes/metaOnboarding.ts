@@ -112,6 +112,18 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
         }
       }
     }
+    const configuredPageId = digits(process.env.META_FACEBOOK_PAGE_ID || '112335748460786');
+    if (!pages.data?.some((item) => item.instagram_business_account?.id) && configuredPageId) {
+      try {
+        const configuredPage = await graphRequest<Page>(
+          `${configuredPageId}?fields=${pageFields}`,
+          exchangeBody.access_token
+        );
+        pages = { data: [...(pages.data || []), configuredPage] };
+      } catch {
+        // Business Login puede ocultar la lista de activos; la validación final sigue siendo obligatoria.
+      }
+    }
     const expectedAccount = process.env.INSTAGRAM_ACCOUNT_ID;
     const page = pages.data?.find((item) =>
       item.instagram_business_account?.id && (!expectedAccount || item.instagram_business_account.id === expectedAccount)
