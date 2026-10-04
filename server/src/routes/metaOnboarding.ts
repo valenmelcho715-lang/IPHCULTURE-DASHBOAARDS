@@ -191,7 +191,7 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
         // Business Login puede ocultar la lista de activos; la validación final sigue siendo obligatoria.
       }
     }
-    const expectedAccount = digits(process.env.INSTAGRAM_ACCOUNT_ID || '102548739164251');
+    const expectedAccount = digits(process.env.INSTAGRAM_ACCOUNT_ID || '17841451079126644');
     const page = pages.data?.find((item) =>
       item.instagram_business_account?.id && (!expectedAccount || item.instagram_business_account.id === expectedAccount)
     );
