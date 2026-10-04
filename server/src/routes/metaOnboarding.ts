@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { authRequired, requireRole, AuthRequest } from '../auth';
 import { db } from '../db';
+import { saveInstagramConnection } from '../automation/metaCredentials';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -39,6 +40,93 @@ router.get('/config', (_req: AuthRequest, res: Response) => {
     coexistence: true,
     liveMessages: process.env.ALLOW_LIVE_MESSAGES === 'true',
   });
+});
+
+router.get('/instagram/config', (_req: AuthRequest, res: Response) => {
+  const appId = process.env.META_APP_ID || '';
+  const configurationId = process.env.META_INSTAGRAM_LOGIN_CONFIG_ID || '';
+  res.json({
+    ready: Boolean(appId && configurationId && process.env.META_APP_SECRET),
+    appId,
+    configurationId,
+    graphVersion: process.env.META_GRAPH_VERSION || 'v26.0',
+    liveMessages: process.env.ALLOW_LIVE_MESSAGES === 'true',
+  });
+});
+
+router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
+  try {
+    if (process.env.ALLOW_LIVE_MESSAGES === 'true') {
+      return res.status(409).json({ error: 'Desactivá los mensajes automáticos antes de conectar Instagram' });
+    }
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
+    if (!code || code.length > 4096) return res.status(400).json({ error: 'Código de autorización inválido' });
+
+    const appId = process.env.META_APP_ID || '';
+    const appSecret = process.env.META_APP_SECRET || '';
+    if (!appId || !appSecret) return res.status(503).json({ error: 'Falta completar la configuración segura de Meta' });
+
+    const version = process.env.META_GRAPH_VERSION || 'v26.0';
+    const exchangeUrl = new URL(`https://graph.facebook.com/${version}/oauth/access_token`);
+    exchangeUrl.searchParams.set('client_id', appId);
+    exchangeUrl.searchParams.set('client_secret', appSecret);
+    exchangeUrl.searchParams.set('code', code);
+    const exchange = await fetch(exchangeUrl, { signal: AbortSignal.timeout(20_000) });
+    const exchangeBody = (await exchange.json().catch(() => ({}))) as { access_token?: string; error?: { message?: string } };
+    if (!exchange.ok || !exchangeBody.access_token) {
+      throw new Error(exchangeBody.error?.message || 'Meta no pudo intercambiar el código de autorización');
+    }
+
+    type Page = {
+      id?: string;
+      name?: string;
+      access_token?: string;
+      instagram_business_account?: { id?: string; username?: string };
+    };
+    const pages = await graphRequest<{ data?: Page[] }>(
+      'me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&limit=100',
+      exchangeBody.access_token
+    );
+    const expectedAccount = process.env.INSTAGRAM_ACCOUNT_ID;
+    const page = pages.data?.find((item) =>
+      item.instagram_business_account?.id && (!expectedAccount || item.instagram_business_account.id === expectedAccount)
+    );
+    const pageId = digits(page?.id);
+    const accountId = digits(page?.instagram_business_account?.id);
+    const pageToken = page?.access_token || exchangeBody.access_token;
+    if (!pageId || !accountId) {
+      throw new Error('Meta no devolvió una Página vinculada con una cuenta profesional de Instagram');
+    }
+
+    await graphRequest(`${accountId}?fields=id,username`, pageToken);
+    let subscribed = false;
+    try {
+      await graphRequest(`${accountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
+      subscribed = true;
+    } catch {
+      await graphRequest(`${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
+      subscribed = true;
+    }
+
+    await saveInstagramConnection({
+      accountId,
+      username: page?.instagram_business_account?.username || null,
+      pageId,
+      token: pageToken,
+    });
+
+    res.json({
+      ok: true,
+      accountId,
+      username: page?.instagram_business_account?.username || null,
+      pageName: page?.name || null,
+      subscribed,
+      liveMessages: false,
+    });
+  } catch (error) {
+    console.error('[instagram-onboarding]', error);
+    res.status(502).json({ error: error instanceof Error ? error.message : 'No se pudo completar la conexión con Instagram' });
+  }
 });
 
 router.post('/complete', async (req: AuthRequest, res: Response) => {

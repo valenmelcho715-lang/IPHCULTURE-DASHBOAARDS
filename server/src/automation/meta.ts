@@ -4,15 +4,16 @@ import {Router} from 'express';
 import {db} from '../db';
 import {receive,BusinessError} from './repository';
 import {transcriptionStatus} from './transcription';
+import {getInstagramConnection} from './metaCredentials';
 export function validSignature(raw:Buffer,signature:string|undefined,secret:string):boolean {
   if(!secret||!signature||!/^sha256=[a-f0-9]{64}$/.test(signature))return false;
   const expected=crypto.createHmac('sha256',secret).update(raw).digest();
   return crypto.timingSafeEqual(expected,Buffer.from(signature.slice(7),'hex'));
 }
-export function connectionStatus(){return {
+export async function connectionStatus(){return {
   openai:!!process.env.OPENAI_API_KEY,
   whatsapp:!!(process.env.WHATSAPP_ACCESS_TOKEN&&process.env.WHATSAPP_PHONE_NUMBER_ID&&process.env.META_APP_SECRET&&process.env.META_VERIFY_TOKEN&&process.env.META_GRAPH_VERSION),
-  instagram:!!(process.env.INSTAGRAM_ACCESS_TOKEN&&process.env.INSTAGRAM_ACCOUNT_ID&&process.env.META_APP_SECRET&&process.env.META_VERIFY_TOKEN&&process.env.META_GRAPH_VERSION),
+  instagram:!!(await getInstagramConnection())&&!!(process.env.META_APP_SECRET&&process.env.META_VERIFY_TOKEN&&process.env.META_GRAPH_VERSION),
   liveDelivery:process.env.ALLOW_LIVE_MESSAGES==='true',
   model:process.env.OPENAI_MODEL||'gpt-4.1-mini',demo:process.env.AUTO_AI_PROVIDER==='demo',transcription:transcriptionStatus(),
 };}
@@ -58,11 +59,12 @@ metaRouter.post('/',async(req,res)=>{
         }
       }
     }else if(body.object==='instagram'){
-      if(!process.env.INSTAGRAM_ACCOUNT_ID){res.sendStatus(503);return;}
+      const instagram=await getInstagramConnection();
+      if(!instagram){res.sendStatus(503);return;}
       for(const entry of body.entry||[]){
-        if(String(entry.id)!==process.env.INSTAGRAM_ACCOUNT_ID)continue;
+        if(String(entry.id)!==instagram.accountId)continue;
         for(const m of entry.messaging||[]){
-          if(m.message?.is_echo||!m.message?.mid||!m.sender?.id||String(m.recipient?.id)!==process.env.INSTAGRAM_ACCOUNT_ID)continue;
+          if(m.message?.is_echo||!m.message?.mid||!m.sender?.id||String(m.recipient?.id)!==instagram.accountId)continue;
           const time=new Date(Number(m.timestamp));
           await receive({channel:'instagram',externalId:String(m.sender.id),providerId:String(m.message.mid),text:String(m.message.text||'[Adjunto de Instagram: requiere revisión]'),kind:m.message.attachments?.length?'attachment':'text',attachments:(m.message.attachments||[]).filter((a:any)=>a.payload?.url).map((a:any)=>({url:a.payload.url,name:a.type||'adjunto'})),timestamp:Number.isFinite(time.getTime())?time.toISOString():undefined});
         }
@@ -86,9 +88,10 @@ export async function sendMeta(c:any,text:string,kind:string,options?:{name?:str
     body=kind==='template'?{messaging_product:'whatsapp',to:c.external_id,type:'template',template:{name:options?.name,language:{code:options?.language}}}:kind==='image'?{messaging_product:'whatsapp',to:c.external_id,type:'image',image:{link:options?.url}}:{messaging_product:'whatsapp',to:c.external_id,type:'text',text:{body:text,preview_url:false}};
   }else{
     if(kind==='template')throw new DeliveryError('Instagram no permite este seguimiento automático');
-    token=process.env.INSTAGRAM_ACCESS_TOKEN;const account=process.env.INSTAGRAM_ACCOUNT_ID;
+    const instagram=await getInstagramConnection();
+    token=instagram?.token;const account=instagram?.accountId;
     if(!token||!account)throw new DeliveryError('Instagram no está conectado');
-    url=`https://graph.instagram.com/${version}/${account}/messages`;
+    url=`https://graph.facebook.com/${version}/${account}/messages`;
     body=kind==='image'?{recipient:{id:c.external_id},message:{attachment:{type:'image',payload:{url:options?.url}}}}:{recipient:{id:c.external_id},message:{text}};
   }
   let r:globalThis.Response;

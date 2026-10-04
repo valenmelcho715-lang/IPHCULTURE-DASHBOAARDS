@@ -23,6 +23,7 @@ import Admin from './pages/Admin';
 import Reportes from './pages/Reportes';
 import ComprobantePublico from './pages/ComprobantePublico';
 import WhatsAppSetup from './pages/WhatsAppSetup';
+import InstagramSetup from './pages/InstagramSetup';
 import { ReactNode } from 'react';
 
 function Protected({ children, roles }: { children: ReactNode; roles?: Array<'admin' | 'oficina' | 'closer'> }) {
@@ -78,6 +79,14 @@ export default function App() {
           element={
             <Protected roles={['admin']}>
               <WhatsAppSetup />
+            </Protected>
+          }
+        />
+        <Route
+          path="/admin/instagram"
+          element={
+            <Protected roles={['admin']}>
+              <InstagramSetup />
             </Protected>
           }
         />

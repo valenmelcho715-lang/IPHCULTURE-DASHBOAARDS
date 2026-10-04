@@ -21,10 +21,10 @@ async function access(req:AuthRequest,id=Number(req.params.id)){
 const scope=(req:AuthRequest,alias='c')=>req.user!.rol==='closer'?`${alias}.owner_id=${Number(req.user!.id)}`:'1=1';
 automationRouter.get('/storage',requireRole('admin'),wrap(async(_req,res)=>res.json(await storageStatus())));
 automationRouter.post('/storage/backup',requireRole('admin'),wrap(async(_req,res)=>{void runBackup().catch(()=>console.error('[backup] Revisar estado del respaldo'));res.status(202).json({queued:true});}));
-automationRouter.get('/status',wrap(async(req,res)=>{const s=await settings();res.json({connections:connectionStatus(),settings:req.user!.rol==='admin'?s:{enabled:s.enabled,usdArs:s.usdArs,maxFollowups:s.maxFollowups}});}));
+automationRouter.get('/status',wrap(async(req,res)=>{const s=await settings();res.json({connections:await connectionStatus(),settings:req.user!.rol==='admin'?s:{enabled:s.enabled,usdArs:s.usdArs,maxFollowups:s.maxFollowups}});}));
 automationRouter.put('/settings',requireRole('admin'),wrap(async(req,res)=>{
   let value;try{value=validateSettings(req.body,await settings());}catch(e){throw new BusinessError((e as Error).message);}
-  if(value.enabled&&!connectionStatus().openai)throw new BusinessError('Conectá la IA antes de activar la atención en vivo');
+  if(value.enabled&&!(await connectionStatus()).openai)throw new BusinessError('Conectá la IA antes de activar la atención en vivo');
   if(value.enabled&&process.env.NODE_ENV==='production'){const storage=await storageStatus();if(!storage.persistentVolumeDeclared||!storage.runs.some(r=>r.status==='external_ok'))throw new BusinessError('Antes de activar atención real, configurar persistencia y completar una copia externa verificada');}
   const users=(await db.execute("SELECT id FROM users WHERE rol='closer'")).rows.map(x=>Number(x.id));
   if(value.closerIds.some(x=>!users.includes(x)))throw new BusinessError('Seleccioná usuarios con rol closer');

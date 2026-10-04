@@ -165,6 +165,9 @@ export default function Admin() {
               <Link to="/admin/whatsapp" className="px-3 py-2 rounded-xl text-sm font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-400/30 hover:border-emerald-300/60">
                 Conectar WhatsApp
               </Link>
+              <Link to="/admin/instagram" className="px-3 py-2 rounded-xl text-sm font-semibold bg-fuchsia-500/15 text-fuchsia-300 border border-fuchsia-400/30 hover:border-fuchsia-300/60">
+                Conectar Instagram
+              </Link>
               <Badge color="amber">Admin</Badge>
             </div>
           )
