@@ -124,38 +124,46 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
         // Business Login puede ocultar la lista de activos; la validación final sigue siendo obligatoria.
       }
     }
-    const expectedAccount = process.env.INSTAGRAM_ACCOUNT_ID;
+    const expectedAccount = digits(process.env.INSTAGRAM_ACCOUNT_ID || '102548739164251');
     const page = pages.data?.find((item) =>
       item.instagram_business_account?.id && (!expectedAccount || item.instagram_business_account.id === expectedAccount)
     );
-    const pageId = digits(page?.id);
-    const accountId = digits(page?.instagram_business_account?.id);
+    const pageId = digits(page?.id) || configuredPageId;
+    let accountId = digits(page?.instagram_business_account?.id) || expectedAccount;
+    let username = page?.instagram_business_account?.username || null;
     const pageToken = page?.access_token || exchangeBody.access_token;
-    if (!pageId || !accountId) {
+    if (!accountId) {
       throw new Error('Meta no devolvió una Página vinculada con una cuenta profesional de Instagram');
     }
 
-    await graphRequest(`${accountId}?fields=id,username`, pageToken);
+    const verifiedAccount = await graphRequest<{ id?: string; username?: string }>(
+      `${accountId}?fields=id,username`,
+      pageToken
+    );
+    accountId = digits(verifiedAccount.id);
+    username = verifiedAccount.username || username;
+    if (!accountId) throw new Error('Meta no pudo validar la cuenta profesional de Instagram');
     let subscribed = false;
     try {
       await graphRequest(`${accountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
       subscribed = true;
     } catch {
+      if (!pageId) throw new Error('Meta no permitió suscribir los mensajes de Instagram');
       await graphRequest(`${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
       subscribed = true;
     }
 
     await saveInstagramConnection({
       accountId,
-      username: page?.instagram_business_account?.username || null,
-      pageId,
+      username,
+      pageId: pageId || '',
       token: pageToken,
     });
 
     res.json({
       ok: true,
       accountId,
-      username: page?.instagram_business_account?.username || null,
+      username,
       pageName: page?.name || null,
       subscribed,
       liveMessages: false,
