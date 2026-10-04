@@ -106,6 +106,7 @@ router.post('/instagram/subscribe', async (_req: AuthRequest, res: Response) => 
   if (!appId || !connection) return res.status(409).json({ error: 'Instagram no está conectado' });
 
   let warning = 'Meta no permitió asociar la cuenta de Instagram con la app';
+  const attempts: Array<{ asset: 'instagram' | 'page'; error: string }> = [];
   for (const assetId of [connection.accountId, connection.pageId].filter(Boolean)) {
     try {
       await graphRequest(
@@ -116,9 +117,13 @@ router.post('/instagram/subscribe', async (_req: AuthRequest, res: Response) => 
       return res.json({ ok: true, subscribed: true });
     } catch (error) {
       warning = error instanceof Error ? error.message : warning;
+      attempts.push({
+        asset: assetId === connection.accountId ? 'instagram' : 'page',
+        error: warning,
+      });
     }
   }
-  res.status(502).json({ error: warning });
+  res.status(502).json({ error: warning, attempts });
 });
 
 router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
