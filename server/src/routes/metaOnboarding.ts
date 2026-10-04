@@ -71,6 +71,10 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
     exchangeUrl.searchParams.set('client_id', appId);
     exchangeUrl.searchParams.set('client_secret', appSecret);
     exchangeUrl.searchParams.set('code', code);
+    exchangeUrl.searchParams.set(
+      'redirect_uri',
+      process.env.META_INSTAGRAM_REDIRECT_URI || 'https://iphoneculture-atencion.onrender.com/admin/instagram'
+    );
     const exchange = await fetch(exchangeUrl, { signal: AbortSignal.timeout(20_000) });
     const exchangeBody = (await exchange.json().catch(() => ({}))) as { access_token?: string; error?: { message?: string } };
     if (!exchange.ok || !exchangeBody.access_token) {
