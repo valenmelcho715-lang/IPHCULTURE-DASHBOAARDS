@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Instagram, ShieldCheck } from 'lucide-react';
 import { api } from '../lib/api';
 import { Badge, Button, Card, PageHeader, Spinner } from '../components/ui';
@@ -21,10 +21,10 @@ type CompleteResult = {
 
 export default function InstagramSetup() {
   const [config, setConfig] = useState<MetaConfig | null>(null);
-  const [sdkReady, setSdkReady] = useState(false);
   const [state, setState] = useState<'idle' | 'waiting' | 'saving' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<CompleteResult | null>(null);
+  const callbackStarted = useRef(false);
 
   useEffect(() => {
     api.get<MetaConfig>('/api/admin/meta-onboarding/instagram/config')
@@ -36,55 +36,58 @@ export default function InstagramSetup() {
   }, []);
 
   useEffect(() => {
-    if (!config?.ready) return;
-    window.fbAsyncInit = () => {
-      window.FB?.init({ appId: config.appId, autoLogAppEvents: true, xfbml: true, version: config.graphVersion });
-      setSdkReady(true);
-    };
-    if (window.FB) window.fbAsyncInit();
-    else if (!document.getElementById('facebook-jssdk')) {
-      const script = document.createElement('script');
-      script.id = 'facebook-jssdk';
-      script.async = true;
-      script.defer = true;
-      script.crossOrigin = 'anonymous';
-      script.src = 'https://connect.facebook.net/es_LA/sdk.js';
-      document.body.appendChild(script);
+    if (!config?.ready || callbackStarted.current) return;
+    const query = new URLSearchParams(window.location.search);
+    const code = query.get('code');
+    const returnedState = query.get('state');
+    const expectedState = sessionStorage.getItem('instagram_oauth_state');
+    const error = query.get('error_description') || query.get('error_message');
+    if (error) {
+      callbackStarted.current = true;
+      setState('error');
+      setMessage(error);
+      window.history.replaceState({}, '', '/admin/instagram');
+      return;
     }
+    if (!code) return;
+    callbackStarted.current = true;
+    window.history.replaceState({}, '', '/admin/instagram');
+    if (!expectedState || returnedState !== expectedState) {
+      setState('error');
+      setMessage('Meta devolvió una autorización que no coincide con esta sesión. Volvé a intentarlo.');
+      return;
+    }
+    sessionStorage.removeItem('instagram_oauth_state');
+    setState('saving');
+    setMessage('Verificando la Página, Instagram y los webhooks…');
+    void api.post<CompleteResult>('/api/admin/meta-onboarding/instagram/complete', { code })
+      .then((value) => {
+        setResult(value);
+        setState('done');
+        setMessage('Instagram quedó conectado y preparado para recibir mensajes.');
+      })
+      .catch((requestError) => {
+        setState('error');
+        setMessage(requestError instanceof Error ? requestError.message : 'No se pudo completar la conexión');
+      });
   }, [config]);
 
   const launch = () => {
-    if (!config || !window.FB) return;
+    if (!config) return;
     setState('waiting');
-    setMessage('Elegí la Página IPHONE Culture Neuquén y la cuenta @iphoneculture_.');
+    setMessage('Abriendo Meta para elegir la Página IPHONE Culture Neuquén y @iphoneculture_…');
     setResult(null);
-    window.FB.login(
-      (response) => {
-        const code = response.authResponse?.code;
-        if (!code) {
-          setState('idle');
-          setMessage('La ventana se cerró sin autorizar la conexión.');
-          return;
-        }
-        setState('saving');
-        setMessage('Verificando la Página, Instagram y los webhooks…');
-        void api.post<CompleteResult>('/api/admin/meta-onboarding/instagram/complete', { code })
-          .then((value) => {
-            setResult(value);
-            setState('done');
-            setMessage('Instagram quedó conectado y preparado para recibir mensajes.');
-          })
-          .catch((error) => {
-            setState('error');
-            setMessage(error instanceof Error ? error.message : 'No se pudo completar la conexión');
-          });
-      },
-      {
-        config_id: config.configurationId,
-        response_type: 'code',
-        override_default_response_type: true,
-      }
-    );
+    const stateValue = crypto.randomUUID();
+    sessionStorage.setItem('instagram_oauth_state', stateValue);
+    const redirectUri = `${window.location.origin}/admin/instagram`;
+    const dialog = new URL(`https://www.facebook.com/${config.graphVersion}/dialog/oauth`);
+    dialog.searchParams.set('client_id', config.appId);
+    dialog.searchParams.set('redirect_uri', redirectUri);
+    dialog.searchParams.set('config_id', config.configurationId);
+    dialog.searchParams.set('response_type', 'code');
+    dialog.searchParams.set('override_default_response_type', 'true');
+    dialog.searchParams.set('state', stateValue);
+    window.location.assign(dialog.toString());
   };
 
   if (!config && state !== 'error') return <Spinner />;
@@ -116,7 +119,7 @@ export default function InstagramSetup() {
             </div>
           </div>
           {!config?.ready && <p className="text-amber-300">Falta completar la configuración de Meta en el servidor.</p>}
-          <Button onClick={launch} disabled={!config?.ready || !sdkReady || state === 'waiting' || state === 'saving' || state === 'done'}>
+          <Button onClick={launch} disabled={!config?.ready || state === 'waiting' || state === 'saving' || state === 'done'}>
             {state === 'saving' ? 'Verificando…' : state === 'done' ? 'Conectado' : 'Conectar con Facebook'}
           </Button>
           {message && <p className={state === 'error' ? 'text-red-300' : 'text-slate-300'}>{message}</p>}
