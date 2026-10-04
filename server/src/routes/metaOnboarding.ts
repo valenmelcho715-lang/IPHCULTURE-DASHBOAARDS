@@ -149,6 +149,7 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
         data?: {
           app_id?: string;
           is_valid?: boolean;
+          scopes?: string[];
           granular_scopes?: Array<{ scope?: string; target_ids?: string[] }>;
         };
       };
@@ -159,7 +160,20 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
       const targetIds = new Set(
         (debug.data?.granular_scopes || []).flatMap((scope) => scope.target_ids || []).map(String)
       );
-      if (!debug.data?.is_valid || String(debug.data.app_id || '') !== appId || !targetIds.has(requestedAccountId)) {
+      const grantedScopes = new Set([
+        ...(debug.data?.scopes || []),
+        ...(debug.data?.granular_scopes || []).map((scope) => String(scope.scope || '')),
+      ]);
+      const identifiesSelectedAsset = targetIds.size === 0
+        || targetIds.has(requestedAccountId)
+        || Boolean(configuredPageId && targetIds.has(configuredPageId))
+        || Boolean(businessId && targetIds.has(businessId));
+      if (
+        !debug.data?.is_valid
+        || String(debug.data.app_id || '') !== appId
+        || !grantedScopes.has('instagram_manage_messages')
+        || !identifiesSelectedAsset
+      ) {
         accountId = null;
       } else {
         username = username || process.env.INSTAGRAM_USERNAME || 'iphoneculture_';
