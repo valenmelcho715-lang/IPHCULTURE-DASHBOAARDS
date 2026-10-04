@@ -16,6 +16,7 @@ type CompleteResult = {
   username: string | null;
   pageName: string | null;
   subscribed: boolean;
+  subscriptionWarning: string | null;
   liveMessages: false;
 };
 
@@ -64,7 +65,9 @@ export default function InstagramSetup() {
       .then((value) => {
         setResult(value);
         setState('done');
-        setMessage('Instagram quedó conectado y preparado para recibir mensajes.');
+        setMessage(value.subscribed
+          ? 'Instagram quedó conectado y preparado para recibir mensajes.'
+          : 'La credencial quedó guardada. Falta habilitar la recepción en Webhooks de Meta.');
       })
       .catch((requestError) => {
         setState('error');

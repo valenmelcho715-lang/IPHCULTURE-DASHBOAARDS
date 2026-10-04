@@ -143,16 +143,6 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
     accountId = digits(verifiedAccount.id);
     username = verifiedAccount.username || username;
     if (!accountId) throw new Error('Meta no pudo validar la cuenta profesional de Instagram');
-    let subscribed = false;
-    try {
-      await graphRequest(`${accountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
-      subscribed = true;
-    } catch {
-      if (!pageId) throw new Error('Meta no permitió suscribir los mensajes de Instagram');
-      await graphRequest(`${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
-      subscribed = true;
-    }
-
     await saveInstagramConnection({
       accountId,
       username,
@@ -160,12 +150,31 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
       token: pageToken,
     });
 
+    let subscribed = false;
+    let subscriptionWarning: string | null = null;
+    try {
+      await graphRequest(`${accountId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
+      subscribed = true;
+    } catch (accountSubscriptionError) {
+      try {
+        if (!pageId) throw accountSubscriptionError;
+        await graphRequest(`${pageId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`, pageToken, { method: 'POST' });
+        subscribed = true;
+      } catch (pageSubscriptionError) {
+        subscriptionWarning = pageSubscriptionError instanceof Error
+          ? pageSubscriptionError.message
+          : 'Meta no permitió suscribir los mensajes de Instagram';
+        console.warn('[instagram-onboarding] Credencial guardada; suscripción pendiente:', subscriptionWarning);
+      }
+    }
+
     res.json({
       ok: true,
       accountId,
       username,
       pageName: page?.name || null,
       subscribed,
+      subscriptionWarning,
       liveMessages: false,
     });
   } catch (error) {
