@@ -33,9 +33,15 @@ export function securityHeaders(req:Request,res:Response,next:NextFunction):void
   res.setHeader('X-Frame-Options','DENY');
   res.setHeader('Referrer-Policy','same-origin');
   res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=()');
-  res.setHeader('Cross-Origin-Opener-Policy','same-origin');
+  // Embedded Signup usa el SDK de Meta y una ventana emergente que devuelve el
+  // codigo temporal al panel. `same-origin` aisla esa ventana y una CSP solo
+  // local impide que el SDK cargue, dejando el boton de conexion deshabilitado.
+  res.setHeader('Cross-Origin-Opener-Policy','same-origin-allow-popups');
   if(req.path.startsWith('/api/'))res.setHeader('Cache-Control','no-store');
-  res.setHeader('Content-Security-Policy',"default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self'");
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' https://connect.facebook.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob:; connect-src 'self' https://graph.facebook.com https://www.facebook.com https://connect.facebook.net; frame-src https://www.facebook.com https://web.facebook.com"
+  );
   if(process.env.NODE_ENV==='production'&&(req.secure||req.header('x-forwarded-proto')==='https'))res.setHeader('Strict-Transport-Security','max-age=31536000; includeSubDomains');
   next();
 }
