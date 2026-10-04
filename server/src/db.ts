@@ -7,8 +7,18 @@ import './config';
 import { createClient } from '@libsql/client';
 import { serializeDatabase } from './database';
 import bcrypt from 'bcryptjs';
+import fs from 'node:fs';
 
-const url = process.env.TURSO_DATABASE_URL || 'file:./iphone-culture.db';
+const configuredUrl = process.env.TURSO_DATABASE_URL || 'file:./iphone-culture.db';
+const productionDatabase = '/app/data/iphone-culture-next.db';
+const productionMarker = '/app/data/use-iphone-culture-next';
+// Render Blueprint fija TURSO_DATABASE_URL. Esta marca permite cambiar a la
+// base real de forma explícita y reversible, sin reemplazar la base anterior.
+const url = configuredUrl === 'file:/app/data/iphone-culture.db'
+  && fs.existsSync(productionMarker)
+  && fs.existsSync(productionDatabase)
+  ? `file:${productionDatabase}`
+  : configuredUrl;
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
 export const db = serializeDatabase(createClient(authToken ? { url, authToken } : { url }));
