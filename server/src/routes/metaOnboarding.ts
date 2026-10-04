@@ -29,6 +29,26 @@ async function graphRequest<T>(path: string, token: string, init?: RequestInit):
   return body;
 }
 
+async function hasInstagramAssetSubscription(
+  accountId: string,
+  pageId: string,
+  token: string,
+  appId: string
+): Promise<boolean> {
+  for (const assetId of [accountId, pageId].filter(Boolean)) {
+    try {
+      const subscriptions = await graphRequest<{ data?: Array<{ id?: string }> }>(
+        `${assetId}/subscribed_apps?fields=id`,
+        token
+      );
+      if (subscriptions.data?.some((item) => String(item.id || '') === appId)) return true;
+    } catch {
+      // El token puede autorizar solamente uno de los dos activos.
+    }
+  }
+  return false;
+}
+
 router.get('/config', (_req: AuthRequest, res: Response) => {
   const appId = process.env.META_APP_ID || '';
   const configurationId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID || '';
@@ -60,6 +80,14 @@ router.get('/instagram/config', async (_req: AuthRequest, res: Response) => {
       // La conexión sigue siendo válida aunque Meta no permita consultar el estado en este momento.
     }
   }
+  if (webhookSubscribed && connection) {
+    webhookSubscribed = await hasInstagramAssetSubscription(
+      connection.accountId,
+      connection.pageId,
+      connection.token,
+      appId
+    );
+  }
   res.json({
     ready: Boolean(appId && configurationId && appSecret),
     appId,
@@ -70,6 +98,27 @@ router.get('/instagram/config', async (_req: AuthRequest, res: Response) => {
     username: connection?.username || null,
     webhookSubscribed,
   });
+});
+
+router.post('/instagram/subscribe', async (_req: AuthRequest, res: Response) => {
+  const appId = process.env.META_APP_ID || '';
+  const connection = await getInstagramConnection();
+  if (!appId || !connection) return res.status(409).json({ error: 'Instagram no está conectado' });
+
+  let warning = 'Meta no permitió asociar la cuenta de Instagram con la app';
+  for (const assetId of [connection.accountId, connection.pageId].filter(Boolean)) {
+    try {
+      await graphRequest(
+        `${assetId}/subscribed_apps?subscribed_fields=messages,messaging_postbacks`,
+        connection.token,
+        { method: 'POST' }
+      );
+      return res.json({ ok: true, subscribed: true });
+    } catch (error) {
+      warning = error instanceof Error ? error.message : warning;
+    }
+  }
+  res.status(502).json({ error: warning });
 });
 
 router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
