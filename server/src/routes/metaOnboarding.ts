@@ -87,10 +87,31 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
       access_token?: string;
       instagram_business_account?: { id?: string; username?: string };
     };
-    const pages = await graphRequest<{ data?: Page[] }>(
-      'me/accounts?fields=id,name,access_token,instagram_business_account{id,username}&limit=100',
-      exchangeBody.access_token
-    );
+    const pageFields = 'id,name,access_token,instagram_business_account{id,username}';
+    let pages: { data?: Page[] } = { data: [] };
+    try {
+      pages = await graphRequest<{ data?: Page[] }>(
+        `me/accounts?fields=${pageFields}&limit=100`,
+        exchangeBody.access_token
+      );
+    } catch {
+      // Los tokens de usuario del sistema no siempre exponen /me/accounts.
+    }
+    const businessId = digits(process.env.META_BUSINESS_ID || '336387824995497');
+    if (!pages.data?.some((item) => item.instagram_business_account?.id) && businessId) {
+      for (const edge of ['owned_pages', 'client_pages']) {
+        try {
+          const businessPages = await graphRequest<{ data?: Page[] }>(
+            `${businessId}/${edge}?fields=${pageFields}&limit=100`,
+            exchangeBody.access_token
+          );
+          pages = { data: [...(pages.data || []), ...(businessPages.data || [])] };
+          if (pages.data?.some((item) => item.instagram_business_account?.id)) break;
+        } catch {
+          // El portfolio puede no tener uno de los dos tipos de relación.
+        }
+      }
+    }
     const expectedAccount = process.env.INSTAGRAM_ACCOUNT_ID;
     const page = pages.data?.find((item) =>
       item.instagram_business_account?.id && (!expectedAccount || item.instagram_business_account.id === expectedAccount)
