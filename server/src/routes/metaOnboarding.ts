@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { authRequired, requireRole, AuthRequest } from '../auth';
 import { db } from '../db';
-import { saveInstagramConnection } from '../automation/metaCredentials';
+import { getInstagramConnection, saveInstagramConnection } from '../automation/metaCredentials';
 
 const router = Router();
 router.use(authRequired, requireRole('admin'));
@@ -42,15 +42,33 @@ router.get('/config', (_req: AuthRequest, res: Response) => {
   });
 });
 
-router.get('/instagram/config', (_req: AuthRequest, res: Response) => {
+router.get('/instagram/config', async (_req: AuthRequest, res: Response) => {
   const appId = process.env.META_APP_ID || '';
+  const appSecret = process.env.META_APP_SECRET || '';
   const configurationId = process.env.META_INSTAGRAM_LOGIN_CONFIG_ID || '';
+  const connection = await getInstagramConnection();
+  let webhookSubscribed = false;
+  if (appId && appSecret) {
+    try {
+      const subscriptions = await graphRequest<{
+        data?: Array<{ object?: string; fields?: Array<{ name?: string }> }>;
+      }>(`${appId}/subscriptions`, `${appId}|${appSecret}`);
+      const instagram = subscriptions.data?.find((item) => item.object === 'instagram');
+      const fields = new Set((instagram?.fields || []).map((field) => String(field.name || '')));
+      webhookSubscribed = fields.has('messages') && fields.has('messaging_postbacks');
+    } catch {
+      // La conexión sigue siendo válida aunque Meta no permita consultar el estado en este momento.
+    }
+  }
   res.json({
-    ready: Boolean(appId && configurationId && process.env.META_APP_SECRET),
+    ready: Boolean(appId && configurationId && appSecret),
     appId,
     configurationId,
     graphVersion: process.env.META_GRAPH_VERSION || 'v26.0',
     liveMessages: process.env.ALLOW_LIVE_MESSAGES === 'true',
+    connected: Boolean(connection),
+    username: connection?.username || null,
+    webhookSubscribed,
   });
 });
 

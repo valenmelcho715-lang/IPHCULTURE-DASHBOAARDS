@@ -9,6 +9,9 @@ type MetaConfig = {
   configurationId: string;
   graphVersion: string;
   liveMessages: boolean;
+  connected: boolean;
+  username: string | null;
+  webhookSubscribed: boolean;
 };
 
 type CompleteResult = {
@@ -29,7 +32,15 @@ export default function InstagramSetup() {
 
   useEffect(() => {
     api.get<MetaConfig>('/api/admin/meta-onboarding/instagram/config')
-      .then(setConfig)
+      .then((value) => {
+        setConfig(value);
+        if (value.connected) {
+          setState('done');
+          setMessage(value.webhookSubscribed
+            ? 'Instagram está conectado y preparado para recibir mensajes.'
+            : 'La credencial está guardada. Falta habilitar la recepción en Webhooks de Meta.');
+        }
+      })
       .catch((error) => {
         setState('error');
         setMessage(error instanceof Error ? error.message : 'No se pudo leer la configuración');
@@ -93,6 +104,12 @@ export default function InstagramSetup() {
     window.location.assign(dialog.toString());
   };
 
+  const connection = result || (config?.connected ? {
+    username: config.username,
+    pageName: null,
+    subscribed: config.webhookSubscribed,
+  } : null);
+
   if (!config && state !== 'error') return <Spinner />;
 
   return (
@@ -128,15 +145,15 @@ export default function InstagramSetup() {
           {message && <p className={state === 'error' ? 'text-red-300' : 'text-slate-300'}>{message}</p>}
         </div>
       </Card>
-      {result && (
+      {connection && (
         <Card>
           <div className="flex items-start gap-3">
             <CheckCircle2 className="h-7 w-7 text-emerald-400 shrink-0" />
             <div className="space-y-1 text-slate-300">
               <div className="font-semibold text-white">Conexión preparada</div>
-              <div>Instagram: {result.username ? `@${result.username}` : 'cuenta profesional verificada'}</div>
-              <div>Página: {result.pageName || 'Página vinculada verificada'}</div>
-              <div>Recepción de mensajes: {result.subscribed ? 'suscrita' : 'pendiente'}</div>
+              <div>Instagram: {connection.username ? `@${connection.username}` : 'cuenta profesional verificada'}</div>
+              <div>Página: {connection.pageName || 'Página vinculada verificada'}</div>
+              <div>Recepción de mensajes: {connection.subscribed ? 'suscrita' : 'pendiente'}</div>
               <div>Respuestas automáticas: desactivadas</div>
             </div>
           </div>
