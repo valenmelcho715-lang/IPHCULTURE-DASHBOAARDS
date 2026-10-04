@@ -135,13 +135,36 @@ router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
     if (!accountId) {
       throw new Error('Meta no devolvió una Página vinculada con una cuenta profesional de Instagram');
     }
+    const requestedAccountId = accountId;
 
-    const verifiedAccount = await graphRequest<{ id?: string; username?: string }>(
-      `${accountId}?fields=id,username`,
-      pageToken
-    );
-    accountId = digits(verifiedAccount.id);
-    username = verifiedAccount.username || username;
+    try {
+      const verifiedAccount = await graphRequest<{ id?: string; username?: string }>(
+        `${accountId}?fields=id,username`,
+        pageToken
+      );
+      accountId = digits(verifiedAccount.id);
+      username = verifiedAccount.username || username;
+    } catch {
+      type DebugToken = {
+        data?: {
+          app_id?: string;
+          is_valid?: boolean;
+          granular_scopes?: Array<{ scope?: string; target_ids?: string[] }>;
+        };
+      };
+      const debug = await graphRequest<DebugToken>(
+        `debug_token?input_token=${encodeURIComponent(pageToken)}`,
+        `${appId}|${appSecret}`
+      );
+      const targetIds = new Set(
+        (debug.data?.granular_scopes || []).flatMap((scope) => scope.target_ids || []).map(String)
+      );
+      if (!debug.data?.is_valid || String(debug.data.app_id || '') !== appId || !targetIds.has(requestedAccountId)) {
+        accountId = null;
+      } else {
+        username = username || process.env.INSTAGRAM_USERNAME || 'iphoneculture_';
+      }
+    }
     if (!accountId) throw new Error('Meta no pudo validar la cuenta profesional de Instagram');
     await saveInstagramConnection({
       accountId,
