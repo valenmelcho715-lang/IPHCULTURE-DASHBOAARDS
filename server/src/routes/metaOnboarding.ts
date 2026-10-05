@@ -49,9 +49,42 @@ async function hasInstagramAssetSubscription(
   return false;
 }
 
-router.get('/config', (_req: AuthRequest, res: Response) => {
+router.get('/config', async (_req: AuthRequest, res: Response) => {
   const appId = process.env.META_APP_ID || '';
   const configurationId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID || '';
+  let connection: Record<string, unknown> | undefined;
+  try {
+    const result = await db.execute('SELECT * FROM meta_connection WHERE id=1');
+    connection = result.rows[0] as Record<string, unknown> | undefined;
+  } catch {
+    // La tabla se crea al completar la primera conexión.
+  }
+  let permanentTokenReady = false;
+  let webhookSubscribed = false;
+  const permanentToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
+  const phoneNumberId = digits(connection?.phone_number_id);
+  const wabaId = digits(connection?.waba_id);
+  if (connection && permanentToken && phoneNumberId) {
+    try {
+      await graphRequest(`${phoneNumberId}?fields=id`, permanentToken);
+      permanentTokenReady = true;
+    } catch {
+      // Mostrar el estado pendiente sin impedir que el administrador abra la pantalla.
+    }
+  }
+  if (connection && permanentToken && wabaId && appId) {
+    try {
+      const subscriptions = await graphRequest<{ data?: Array<{ id?: string }> }>(
+        `${wabaId}/subscribed_apps?fields=id`,
+        permanentToken
+      );
+      webhookSubscribed = Boolean(
+        subscriptions.data?.some((item) => String(item.id || '') === appId)
+      );
+    } catch {
+      // La conexión puede seguir activa aunque Meta no permita consultar el estado temporalmente.
+    }
+  }
   res.json({
     ready: Boolean(appId && configurationId && process.env.META_APP_SECRET),
     appId,
@@ -59,6 +92,10 @@ router.get('/config', (_req: AuthRequest, res: Response) => {
     graphVersion: process.env.META_GRAPH_VERSION || 'v26.0',
     coexistence: true,
     liveMessages: process.env.ALLOW_LIVE_MESSAGES === 'true',
+    connected: Boolean(connection),
+    permanentTokenReady,
+    webhookSubscribed,
+    connectedAt: connection?.connected_at || null,
   });
 });
 
@@ -380,6 +417,7 @@ router.post('/complete', async (req: AuthRequest, res: Response) => {
       wabaId,
       sync,
       permanentTokenReady,
+      webhookSubscribed: true,
       liveMessages: false,
     });
   } catch (error) {

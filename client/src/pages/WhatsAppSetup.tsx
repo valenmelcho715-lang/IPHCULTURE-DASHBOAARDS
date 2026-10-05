@@ -10,6 +10,10 @@ type MetaConfig = {
   graphVersion: string;
   coexistence: boolean;
   liveMessages: boolean;
+  connected: boolean;
+  permanentTokenReady: boolean;
+  webhookSubscribed: boolean;
+  connectedAt: string | null;
 };
 
 type SignupSession = {
@@ -23,6 +27,7 @@ type CompleteResult = {
   coexistence: boolean;
   permanentTokenReady: boolean;
   sync: { contacts: boolean; history: boolean };
+  webhookSubscribed?: boolean;
 };
 
 declare global {
@@ -47,7 +52,20 @@ export default function WhatsAppSetup() {
 
   useEffect(() => {
     api.get<MetaConfig>('/api/admin/meta-onboarding/config')
-      .then(setConfig)
+      .then((response) => {
+        setConfig(response);
+        if (response.connected) {
+          setResult({
+            ok: true,
+            coexistence: true,
+            permanentTokenReady: response.permanentTokenReady,
+            webhookSubscribed: response.webhookSubscribed,
+            sync: { contacts: false, history: false },
+          });
+          setState('done');
+          setMessage('WhatsApp Business ya está conectado sin desactivar la app del celular.');
+        }
+      })
       .catch((error) => {
         setState('error');
         setMessage(error instanceof Error ? error.message : 'No se pudo leer la configuración');
@@ -206,6 +224,7 @@ export default function WhatsAppSetup() {
               <div>Contactos: {result.sync.contacts ? 'sincronización iniciada' : 'pendiente'}</div>
               <div>Historial: {result.sync.history ? 'sincronización iniciada' : 'no compartido o pendiente'}</div>
               <div>Token permanente: {result.permanentTokenReady ? 'verificado' : 'requiere asignar el nuevo activo'}</div>
+              <div>Webhook: {result.webhookSubscribed ? 'activo' : 'pendiente de verificación'}</div>
               <div>Respuestas automáticas: desactivadas</div>
             </div>
           </div>
