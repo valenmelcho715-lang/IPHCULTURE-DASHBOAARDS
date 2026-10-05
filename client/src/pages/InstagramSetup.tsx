@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Instagram, ShieldCheck } from 'lucide-react';
 import { api } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { Badge, Button, Card, PageHeader, Spinner } from '../components/ui';
 
 type MetaConfig = {
@@ -24,6 +25,8 @@ type CompleteResult = {
 };
 
 export default function InstagramSetup() {
+  const { user } = useAuth();
+  const isMetaReviewer = user?.email === 'meta-review@iphoneculture.com';
   const [config, setConfig] = useState<MetaConfig | null>(null);
   const [state, setState] = useState<'idle' | 'waiting' | 'saving' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -119,6 +122,13 @@ export default function InstagramSetup() {
         subtitle="Autorización mediante Facebook y la Página vinculada"
         actions={<Badge color="success">Sin respuestas automáticas</Badge>}
       />
+      {isMetaReviewer && (
+        <Card>
+          <p className="text-sm text-slate-300">
+            Entorno de revisión de Meta: esta cuenta solo puede acceder a la conexión de Instagram.
+          </p>
+        </Card>
+      )}
       <Card>
         <div className="flex items-start gap-4">
           <ShieldCheck className="h-8 w-8 text-neon shrink-0" />
@@ -139,8 +149,12 @@ export default function InstagramSetup() {
             </div>
           </div>
           {!config?.ready && <p className="text-amber-300">Falta completar la configuración de Meta en el servidor.</p>}
-          <Button onClick={launch} disabled={!config?.ready || state === 'waiting' || state === 'saving' || state === 'done'}>
-            {state === 'saving' ? 'Verificando…' : state === 'done' ? 'Conectado' : 'Conectar con Facebook'}
+          <Button onClick={launch} disabled={!config?.ready || state === 'waiting' || state === 'saving' || (state === 'done' && !isMetaReviewer)}>
+            {state === 'saving'
+              ? 'Verificando…'
+              : state === 'done'
+                ? isMetaReviewer ? 'Volver a conectar con Meta' : 'Conectado'
+                : 'Conectar con Facebook'}
           </Button>
           {message && <p className={state === 'error' ? 'text-red-300' : 'text-slate-300'}>{message}</p>}
         </div>
