@@ -34,6 +34,14 @@ function Protected({ children, roles }: { children: ReactNode; roles?: Array<'ad
   return <>{children}</>;
 }
 
+function HomeRoute() {
+  const { user } = useAuth();
+  if (user?.email === 'meta-review@iphoneculture.com') {
+    return <Navigate to="/admin/instagram" replace />;
+  }
+  return <Dashboard />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -46,7 +54,7 @@ export default function App() {
           </Protected>
         }
       >
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route path="/ventas" element={<Ventas />} />
         <Route path="/canjes" element={<Canjes />} />
         <Route path="/chat" element={<Chat />} />

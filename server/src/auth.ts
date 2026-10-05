@@ -22,6 +22,8 @@ export interface AuthRequest extends Request {
   user?: JwtUser;
 }
 
+export const META_REVIEWER_EMAIL = 'meta-review@iphoneculture.com';
+
 export function signToken(user: JwtUser): string {
   return jwt.sign(user, JWT_SECRET, { expiresIn: '7d' });
 }
@@ -38,6 +40,14 @@ export async function authRequired(req: AuthRequest, res: Response, next: NextFu
     const row = (await db.execute({sql: 'SELECT id,nombre,email,rol FROM users WHERE id=?',args:[claimed.id]})).rows[0];
     if (!row) { res.status(401).json({error:'Usuario no disponible'}); return; }
     req.user = row as unknown as JwtUser;
+    if (req.user.email === META_REVIEWER_EMAIL) {
+      const allowed = req.originalUrl === '/api/auth/me'
+        || req.originalUrl.startsWith('/api/admin/meta-onboarding/instagram');
+      if (!allowed) {
+        res.status(403).json({ error: 'La cuenta de revisión solo puede acceder a la conexión de Instagram' });
+        return;
+      }
+    }
     next();
   } catch {
     res.status(401).json({ error: 'Token inválido o expirado' });

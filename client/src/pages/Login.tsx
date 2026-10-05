@@ -19,7 +19,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   // Ya logueado → directo al dashboard
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={user.email === 'meta-review@iphoneculture.com' ? '/admin/instagram' : '/'} replace />;
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -28,7 +28,8 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      navigate('/');
+      const reviewLogin = email.trim().toLowerCase() === 'meta-review@iphoneculture.com';
+      navigate(reviewLogin ? '/admin/instagram' : '/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión');
     } finally {
