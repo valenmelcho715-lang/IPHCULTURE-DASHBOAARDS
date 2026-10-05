@@ -42,12 +42,14 @@ export function normalizePhone(value: string): string {
   return digits.length >= 10 && digits.length <= 15 ? digits : '';
 }
 export function optedOut(text: string): boolean {
-  return /\b(baja|stop|no me escribas|no me contacten|no quiero mensajes|dej[aá] de escribirme|no me mandes m[aá]s)\b/i.test(text);
+  return /\b(baja|stop|borrame de la lista|no me escribas|no me contacten|no quiero mensajes|no quiero (?:que me hablen|recibir mensajes)|dej[aá] de escribirme|dejen de contactarme|no me mandes m[aá]s|no manden m[aá]s mensajes|no me env[ií]es nada m[aá]s|par[aá] de escribirme|no autorizo mensajes)\b/i.test(text);
 }
 export function handoffReason(q: Qualification, text: string): string | null {
+  const normalized=text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if (['payment', 'complaint', 'warranty'].includes(q.intent)) return ({payment:'Confirmación de dinero o seña',complaint:'Reclamo',warranty:'Garantía'} as Record<string,string>)[q.intent];
-  if (/\b(reservar|reserva(?:rlo|rla)?|separar|guardar(?:me)?\s+(?:el|la|un|una)\s+equipo)\b/i.test(text)) return 'Reserva solicitada: requiere atención humana';
-  if (/\b(se[ñn]a|transfer[ií]|comprobante|denuncia|estafa|reclamo|garant[ií]a|no funciona|falla|problema|hablar con (alguien|una persona|un vendedor))\b/i.test(text)) return 'Requiere atención de una persona';
+  if (/\b(reserva|reservar|reservado|reservame|reservalo|reservas|separar|separamelo|guardar|guarda|guardame|guardarme|apartar|apartado|asegurar el stock|dejar sena)\b/.test(normalized)) return 'Reserva solicitada: requiere atención humana';
+  if (/\b(ignora (?:tus|las) reglas|olvida (?:tus|las) instrucciones|mostrame (?:las )?claves|contrasena de administracion|costo (?:interno|de compra)|soy el dueno|cambia el precio|pone (?:el )?iphone|regalame|stock gratis|soy admin|secretos del sistema|saltate las reglas|sin verificar|acceso al panel)\b/.test(normalized)) return 'Solicitud que requiere validación humana';
+  if (/\b(ya\s+)?(pagu[eé]|abon[eé]|transfer[ií]|acredit[eé])\b|\b(hice (?:el )?pago|se[ñn]a|comprobante|denuncia|estafa|estafaron|reclamo|garant[ií]a|no funciona|falla|fallado|defectuoso|problemas?|no prende|no enciende|se apaga|se reinicia|no carga|me cobraron|no (?:me )?entregaron|p[eé]sim[oa] (?:atenci[oó]n|servicio)|nadie (?:me )?(?:responde|contesta)|nadie se hace cargo|me prometieron|me dijeron una cosa|me dieron otra|devu[eé]lvanme|devolveme|devuelvan el dinero|furios[oa]|enojad[oa]|re caliente|un desastre|una verg[uü]enza|hart[oa]|cansad[oa] de esperar|espero respuesta|sin equipo|hablar con (alguien|una persona|un vendedor))\b/i.test(text)) return 'Requiere atención de una persona';
   if (q.tradeRepaired === true || q.tradeInternalOk === false) return 'Canje con reparación o falla: revisión de oficina';
   return null;
 }

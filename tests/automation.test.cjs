@@ -113,6 +113,16 @@ test('El modo demo reconoce presupuesto con preposición y separa el equipo de c
   const trade=intelligence.demoExtract('Entrego un iPhone 12 de 128 GB, batería 85 y detalles leves.',domain.EMPTY_QUALIFICATION);
   assert.equal(trade.intent,'trade_in');assert.equal(trade.product,null);assert.equal(trade.tradeModel,'iPhone 12');assert.equal(trade.tradeBrand,'iPhone');assert.equal(trade.tradeBattery,85);assert.equal(trade.tradeCondition,'Detalles leves');
 });
+test('El modo demo entiende conversación fragmentada, pagos, objeciones y reclamos informales',()=>{
+  const product=intelligence.demoExtract('En 12 cuotas',domain.EMPTY_QUALIFICATION,['Hola','Busco el 15']);
+  assert.equal(product.product,'iPhone 15');assert.equal(product.installments,12);assert.equal(product.payment,'Tarjeta de crédito');
+  const payment=intelligence.demoExtract('Aceptan tarjeta?',domain.EMPTY_QUALIFICATION);assert.equal(payment.topic,'payment_options');
+  const hours=intelligence.demoExtract('Hoy hasta qué hora están?',domain.EMPTY_QUALIFICATION);assert.equal(hours.topic,'hours');
+  const objection=intelligence.demoExtract('Si pago efectivo me bajas el 17 pro max?',domain.EMPTY_QUALIFICATION);
+  assert.equal(objection.product,'iPhone 17 Pro Max');assert.equal(objection.priceObjection,true);
+  const angry=intelligence.demoExtract('Hace días que nadie me responde, pésima atención',domain.EMPTY_QUALIFICATION);
+  assert.equal(angry.intent,'complaint');
+});
 test('No entrega costos a closers ni oficina aunque soliciten la API directamente',async()=>{
   for(const role of ['closerA','office']){const r=await request('/api/stock',role);assert.equal(r.status,200);assert.equal('precio_costo_usd' in r.body[0],false);}
   assert.equal((await request('/api/stock','admin')).body[0].precio_costo_usd,400);
@@ -144,7 +154,8 @@ test('Respuesta automática cotiza desde Stock y deja trazabilidad',async()=>{
   assert.equal(Number((await db.execute({sql:'SELECT COUNT(*) AS n FROM crm_quotes WHERE conversation_id=?',args:[r.id]})).rows[0].n),1);
 });
 test('El tono social es breve y no confunde un agradecimiento con otra compra',async()=>{
-  assert.match(responseCopy.courtesyReply('Hola!!'),/¿Cómo estás\?.*asistente virtual.*Contame/);
+  assert.match(responseCopy.courtesyReply('Hola!!'),/¿Cómo estás\?.*Gracias por escribirnos.*Contame/);
+  assert.doesNotMatch(responseCopy.courtesyReply('Hola!!'),/asistente virtual/i);
   assert.match(responseCopy.courtesyReply('Muchas gracias.'),/De nada/);
   assert.equal(responseCopy.courtesyReply('Gracias, quiero un iPhone 13'),null);
   const externalId=crypto.randomUUID();

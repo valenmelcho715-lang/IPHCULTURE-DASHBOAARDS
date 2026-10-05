@@ -12,6 +12,7 @@
     "lint": "npm run lint -w client",
     "start": "node server/dist/index.js",
     "test": "npm run build -w server && node --test --test-concurrency=1 tests/*.test.cjs",
+    "eval:conversations": "npm run build -w server && node scripts/eval-conversations.cjs",
     "test:ui": "node scripts/review-ui.cjs",
     "migration:export": "node scripts/export-database.cjs",
     "migration:check": "python3 scripts/check-migration.py",
