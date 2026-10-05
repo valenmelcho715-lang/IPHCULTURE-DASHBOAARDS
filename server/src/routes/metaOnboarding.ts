@@ -99,6 +99,27 @@ router.get('/config', async (_req: AuthRequest, res: Response) => {
   });
 });
 
+router.post('/subscribe', async (_req: AuthRequest, res: Response) => {
+  try {
+    const result = await db.execute('SELECT * FROM meta_connection WHERE id=1');
+    const connection = result.rows[0] as Record<string, unknown> | undefined;
+    const wabaId = digits(connection?.waba_id);
+    const permanentToken = process.env.WHATSAPP_ACCESS_TOKEN || '';
+    if (!wabaId || !permanentToken) {
+      return res.status(409).json({ error: 'WhatsApp Business todavia no esta conectado' });
+    }
+
+    await graphRequest(`${wabaId}/subscribed_apps?subscribed_fields=messages`, permanentToken, {
+      method: 'POST',
+    });
+    res.json({ ok: true, webhookSubscribed: true });
+  } catch (error) {
+    res.status(502).json({
+      error: error instanceof Error ? error.message : 'No se pudo activar el webhook de WhatsApp',
+    });
+  }
+});
+
 router.get('/instagram/config', async (_req: AuthRequest, res: Response) => {
   const appId = process.env.META_APP_ID || '';
   const appSecret = process.env.META_APP_SECRET || '';

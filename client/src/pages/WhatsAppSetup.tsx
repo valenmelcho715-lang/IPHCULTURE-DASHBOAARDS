@@ -55,15 +55,25 @@ export default function WhatsAppSetup() {
       .then((response) => {
         setConfig(response);
         if (response.connected) {
-          setResult({
+          const connectedResult: CompleteResult = {
             ok: true,
             coexistence: true,
             permanentTokenReady: response.permanentTokenReady,
             webhookSubscribed: response.webhookSubscribed,
             sync: { contacts: false, history: false },
-          });
+          };
+          setResult(connectedResult);
           setState('done');
           setMessage('WhatsApp Business ya está conectado sin desactivar la app del celular.');
+          if (response.permanentTokenReady && !response.webhookSubscribed) {
+            void api.post<{ webhookSubscribed: boolean }>('/api/admin/meta-onboarding/subscribe', {})
+              .then((subscription) => {
+                setResult({ ...connectedResult, webhookSubscribed: subscription.webhookSubscribed });
+              })
+              .catch(() => {
+                // Mantener el estado pendiente si Meta no confirma la suscripción.
+              });
+          }
         }
       })
       .catch((error) => {
