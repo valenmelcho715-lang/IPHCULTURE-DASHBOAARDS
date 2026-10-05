@@ -426,6 +426,15 @@ export async function initDb(force = false): Promise<void> {
     if (process.env.BOOTSTRAP_ADMIN_PASSWORD.length < 12) throw new Error('La contraseña inicial debe tener al menos 12 caracteres');
     await db.execute({sql: 'INSERT INTO users(nombre,email,password_hash,rol) VALUES(?,?,?,?)', args: ['Administración', process.env.BOOTSTRAP_ADMIN_EMAIL, bcrypt.hashSync(process.env.BOOTSTRAP_ADMIN_PASSWORD, 12), 'admin']});
   }
+  const reviewerPassword = process.env.META_REVIEWER_PASSWORD;
+  if (reviewerPassword) {
+    if (reviewerPassword.length < 16) throw new Error('La contraseña de revisión de Meta debe tener al menos 16 caracteres');
+    await db.execute({
+      sql: `INSERT INTO users(nombre,email,password_hash,rol) VALUES(?,?,?,?)
+            ON CONFLICT(email) DO UPDATE SET nombre=excluded.nombre,password_hash=excluded.password_hash,rol=excluded.rol`,
+      args: ['Revisión de Meta', 'meta-review@iphoneculture.com', bcrypt.hashSync(reviewerPassword, 12), 'admin'],
+    });
+  }
   // Seed cuotas
   const cuotasCount = await db.execute('SELECT COUNT(*) as c FROM cuotas_fees');
   if (Number(cuotasCount.rows[0].c) === 0) {
