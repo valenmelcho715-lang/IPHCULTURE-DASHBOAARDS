@@ -71,7 +71,7 @@ export default function Atencion(){
   const stats=metrics?.stats||{};
   return <div className="space-y-5 pb-8">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><div className="flex items-center gap-2"><div className="p-2 rounded-xl bg-neon/10 text-neon"><Bot size={24}/></div><h1 className="text-2xl font-bold">Atención IA</h1><Badge color={status?.settings.enabled&&status?.connections.liveDelivery?'success':'amber'}>{status?.settings.enabled&&status?.connections.liveDelivery?'Automática':'Pendiente de conexión'}</Badge></div><p className="text-sm text-slate-400 mt-2">Cada consulta, su contexto y el próximo paso. Atención automática las 24 horas.</p></div>
+      <div><div className="flex items-center gap-2"><div className="p-2 rounded-xl bg-neon/10 text-neon"><Bot size={24}/></div><h1 className="text-2xl font-bold">Atención IA</h1><Badge color={status?.settings.enabled&&status?.connections.liveDelivery?'success':'amber'}>{status?.settings.enabled&&status?.connections.liveDelivery?'Automática':'Automatización apagada'}</Badge></div><p className="text-sm text-slate-400 mt-2">Cada consulta, su contexto y el próximo paso. Atención automática las 24 horas.</p></div>
       <div className="flex gap-2">{admin&&<Button variant="ghost" onClick={()=>setTestOpen(true)}><FlaskConical size={15} className="inline mr-2"/>Probar conversación</Button>}<Button variant="ghost" onClick={()=>void load()} title="Actualizar"><RefreshCw size={16}/></Button></div>
     </div>
     {error&&<div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 flex justify-between gap-4"><span>{error}</span><button onClick={()=>setError('')} aria-label="Cerrar error">×</button></div>}
