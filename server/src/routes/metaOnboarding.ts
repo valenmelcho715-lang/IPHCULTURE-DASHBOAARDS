@@ -49,6 +49,26 @@ async function hasInstagramAssetSubscription(
   return false;
 }
 
+async function ensureInstagramAppSubscription(appId: string, appSecret: string): Promise<void> {
+  const verifyToken = process.env.META_VERIFY_TOKEN || '';
+  const callbackUrl = process.env.META_WEBHOOK_CALLBACK_URL
+    || 'https://iphoneculture-atencion.onrender.com/api/integrations/meta';
+  if (!verifyToken) throw new Error('Falta configurar el token de verificación de Meta');
+
+  const body = new URLSearchParams({
+    object: 'instagram',
+    callback_url: callbackUrl,
+    fields: 'messages,messaging_postbacks',
+    verify_token: verifyToken,
+    include_values: 'true',
+  });
+  await graphRequest(`${appId}/subscriptions`, `${appId}|${appSecret}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+}
+
 router.get('/config', async (_req: AuthRequest, res: Response) => {
   const appId = process.env.META_APP_ID || '';
   const configurationId = process.env.META_EMBEDDED_SIGNUP_CONFIG_ID || '';
@@ -160,8 +180,18 @@ router.get('/instagram/config', async (_req: AuthRequest, res: Response) => {
 
 router.post('/instagram/subscribe', async (_req: AuthRequest, res: Response) => {
   const appId = process.env.META_APP_ID || '';
+  const appSecret = process.env.META_APP_SECRET || '';
   const connection = await getInstagramConnection();
-  if (!appId || !connection) return res.status(409).json({ error: 'Instagram no está conectado' });
+  if (!appId || !appSecret || !connection) return res.status(409).json({ error: 'Instagram no está conectado' });
+
+  try {
+    await ensureInstagramAppSubscription(appId, appSecret);
+  } catch (error) {
+    return res.status(502).json({
+      error: error instanceof Error ? error.message : 'Meta no permitió configurar el webhook de Instagram',
+      stage: 'app_webhook',
+    });
+  }
 
   let warning = 'Meta no permitió asociar la cuenta de Instagram con la app';
   const attempts: Array<{ asset: 'instagram' | 'page'; error: string }> = [];
@@ -172,7 +202,14 @@ router.post('/instagram/subscribe', async (_req: AuthRequest, res: Response) => 
         connection.token,
         { method: 'POST' }
       );
-      return res.json({ ok: true, subscribed: true });
+      const subscribed = await hasInstagramAssetSubscription(
+        connection.accountId,
+        connection.pageId,
+        connection.token,
+        appId
+      );
+      if (subscribed) return res.json({ ok: true, subscribed: true });
+      warning = 'Meta aceptó la solicitud, pero todavía no informa la cuenta como suscrita';
     } catch (error) {
       warning = error instanceof Error ? error.message : warning;
       attempts.push({
@@ -181,7 +218,7 @@ router.post('/instagram/subscribe', async (_req: AuthRequest, res: Response) => 
       });
     }
   }
-  res.status(502).json({ error: warning, attempts });
+  res.status(502).json({ error: warning, stage: 'asset_subscription', attempts });
 });
 
 router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {

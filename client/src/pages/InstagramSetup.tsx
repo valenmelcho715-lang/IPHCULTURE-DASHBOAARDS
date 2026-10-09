@@ -28,7 +28,7 @@ export default function InstagramSetup() {
   const { user } = useAuth();
   const isMetaReviewer = user?.email === 'meta-review@iphoneculture.com';
   const [config, setConfig] = useState<MetaConfig | null>(null);
-  const [state, setState] = useState<'idle' | 'waiting' | 'saving' | 'done' | 'error'>('idle');
+  const [state, setState] = useState<'idle' | 'waiting' | 'saving' | 'subscribing' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [result, setResult] = useState<CompleteResult | null>(null);
   const callbackStarted = useRef(false);
@@ -107,6 +107,23 @@ export default function InstagramSetup() {
     window.location.assign(dialog.toString());
   };
 
+  const subscribe = () => {
+    setState('subscribing');
+    setMessage('Activando la recepción de mensajes en Meta…');
+    void api.post<{ ok: boolean; subscribed: boolean }>('/api/admin/meta-onboarding/instagram/subscribe', {})
+      .then((value) => {
+        if (!value.subscribed) throw new Error('Meta todavía no confirmó la suscripción');
+        setConfig((current) => current ? { ...current, webhookSubscribed: true } : current);
+        setResult((current) => current ? { ...current, subscribed: true, subscriptionWarning: null } : current);
+        setState('done');
+        setMessage('Instagram está conectado y preparado para recibir mensajes.');
+      })
+      .catch((requestError) => {
+        setState('error');
+        setMessage(requestError instanceof Error ? requestError.message : 'No se pudo activar la recepción de Instagram');
+      });
+  };
+
   const connection = result || (config?.connected ? {
     username: config.username,
     pageName: null,
@@ -156,6 +173,15 @@ export default function InstagramSetup() {
                 ? isMetaReviewer ? 'Volver a conectar con Meta' : 'Conectado'
                 : 'Conectar con Facebook'}
           </Button>
+          {config?.connected && !config.webhookSubscribed && !isMetaReviewer && (
+            <Button
+              variant="success"
+              onClick={subscribe}
+              disabled={state === 'subscribing'}
+            >
+              {state === 'subscribing' ? 'Activando recepción…' : 'Activar recepción de mensajes'}
+            </Button>
+          )}
           {message && <p className={state === 'error' ? 'text-red-300' : 'text-slate-300'}>{message}</p>}
         </div>
       </Card>
