@@ -8,9 +8,16 @@ Request Advanced Access for the permissions used by this flow:
 
 - `instagram_basic`
 - `instagram_manage_messages`
-- `pages_manage_metadata`
 - `pages_show_list`
 - `pages_read_engagement`
+- `business_management`
+
+Meta's **Instagram API with Facebook Login** setup lists these five permissions for the
+messaging flow. `business_management` is used only to authorize and validate the
+business-owned Page and linked Instagram professional account; the application does
+not manage ads or third-party businesses. Do not request `pages_manage_metadata` for
+this Business Login configuration because Meta does not expose it in the configuration
+permission selector.
 
 Do not submit `instagram_business_basic` or `instagram_business_manage_messages` while the application uses the Facebook Login flow. Those permissions belong to the separate Instagram Login flow.
 
@@ -35,7 +42,7 @@ Record a new video in English and add captions or on-screen explanations.
 7. From a separate Instagram test account, send a new DM to the professional account.
 8. Show the DM arriving in the application's inbox.
 9. Send one manual reply from the application and show it arriving in the Instagram test account.
-10. State that the permissions are used only to identify the professional account, subscribe to its webhooks, receive its DMs, and send replies requested by a team member.
+10. State that the permissions are used only to authorize the business-owned assets, identify the professional account, subscribe to its webhooks, receive its DMs, and send replies requested by a team member.
 
 The recording must show the same Facebook Login flow and permission names selected in the submission. Do not reuse the rejected recording from October 5, 2026.
 
@@ -43,5 +50,4 @@ The recording must show the same Facebook Login flow and permission names select
 
 Suggested English text:
 
-> iPhone Culture uses the Instagram API with Facebook Login to connect its own Instagram professional account and the linked Facebook Page. The server exchanges the OAuth code, securely stores the Page access token, subscribes the account to Instagram messaging webhooks, receives customer-initiated Instagram Direct messages, and allows an assigned sales representative to reply from the internal inbox. The reviewer video shows the complete Meta authorization flow, a real incoming test DM, and a manual reply. Automatic replies are disabled during review.
-
+> iPhone Culture uses the Instagram API with Facebook Login to connect its own Instagram professional account and the linked Facebook Page. `business_management` is used only to authorize and validate the business-owned assets required by Meta's setup; the app does not manage ads or third-party businesses. The server exchanges the OAuth code, securely stores the Page access token, subscribes the account to Instagram messaging webhooks, receives customer-initiated Instagram Direct messages, and allows an assigned sales representative to reply from the internal inbox. The reviewer video shows the complete Meta authorization flow, a real incoming test DM, and a manual reply. Automatic replies are disabled during review.
