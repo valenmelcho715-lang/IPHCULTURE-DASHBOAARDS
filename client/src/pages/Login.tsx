@@ -17,6 +17,8 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const reviewMode = new URLSearchParams(window.location.search).get('review') === 'meta'
+    || email.trim().toLowerCase() === 'meta-review@iphoneculture.com';
 
   // Ya logueado → directo al dashboard
   if (user) return <Navigate to={user.email === 'meta-review@iphoneculture.com' ? '/admin/instagram' : '/'} replace />;
@@ -31,7 +33,7 @@ export default function Login() {
       const reviewLogin = email.trim().toLowerCase() === 'meta-review@iphoneculture.com';
       navigate(reviewLogin ? '/admin/instagram' : '/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión');
+      setError(err instanceof Error ? err.message : reviewMode ? 'Unable to sign in' : 'No se pudo iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export default function Login() {
             <h1 className="text-3xl font-extrabold text-neon glow-text tracking-tight">
               iPhone Culture
             </h1>
-            <p className="text-sm text-slate-400 mt-1">Panel de ventas — Neuquén</p>
+            <p className="text-sm text-slate-400 mt-1">{reviewMode ? 'Meta App Review portal' : 'Panel de ventas — Neuquén'}</p>
           </div>
 
           {/* Formulario */}
@@ -85,7 +87,7 @@ export default function Login() {
               </div>
             </div>
             <div>
-              <Label>Contraseña</Label>
+              <Label>{reviewMode ? 'Password' : 'Contraseña'}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
                 <Input
@@ -115,7 +117,7 @@ export default function Login() {
               {loading && (
                 <span className="w-4 h-4 border-2 border-base-900/30 border-t-base-900 rounded-full animate-spin" />
               )}
-              {loading ? 'Ingresando…' : 'Ingresar'}
+              {loading ? (reviewMode ? 'Signing in…' : 'Ingresando…') : (reviewMode ? 'Sign in' : 'Ingresar')}
             </button>
           </form>
         </div>

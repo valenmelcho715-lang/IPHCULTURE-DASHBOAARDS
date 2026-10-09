@@ -257,7 +257,7 @@ export default function Layout() {
       {/* Links */}
       <nav className="flex flex-col gap-1 flex-1 overflow-y-auto">
         {(user?.email === 'meta-review@iphoneculture.com'
-          ? [{ to: '/admin/instagram', label: 'Instagram', icon: MessageCircle, roles: ['admin'] as Rol[] }]
+          ? [{ to: '/admin/instagram', label: 'Instagram review', icon: MessageCircle, roles: ['admin'] as Rol[] }]
           : links)
           .filter((l) => user && l.roles.includes(user.rol))
           .map((l) => {

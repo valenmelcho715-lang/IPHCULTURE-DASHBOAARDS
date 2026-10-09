@@ -40,15 +40,15 @@ export default function InstagramSetup() {
         if (value.connected) {
           setState('done');
           setMessage(value.webhookSubscribed
-            ? 'Instagram está conectado y preparado para recibir mensajes.'
-            : 'La credencial está guardada. Falta habilitar la recepción en Webhooks de Meta.');
+            ? (isMetaReviewer ? 'Instagram is connected and ready to receive messages.' : 'Instagram está conectado y preparado para recibir mensajes.')
+            : (isMetaReviewer ? 'The credential is stored. Meta Webhooks still needs message reception enabled.' : 'La credencial está guardada. Falta habilitar la recepción en Webhooks de Meta.'));
         }
       })
       .catch((error) => {
         setState('error');
         setMessage(error instanceof Error ? error.message : 'No se pudo leer la configuración');
       });
-  }, []);
+  }, [isMetaReviewer]);
 
   useEffect(() => {
     if (!config?.ready || callbackStarted.current) return;
@@ -69,30 +69,36 @@ export default function InstagramSetup() {
     window.history.replaceState({}, '', '/admin/instagram');
     if (!expectedState || returnedState !== expectedState) {
       setState('error');
-      setMessage('Meta devolvió una autorización que no coincide con esta sesión. Volvé a intentarlo.');
+      setMessage(isMetaReviewer
+        ? 'Meta returned an authorization that does not match this session. Please try again.'
+        : 'Meta devolvió una autorización que no coincide con esta sesión. Volvé a intentarlo.');
       return;
     }
     sessionStorage.removeItem('instagram_oauth_state');
     setState('saving');
-    setMessage('Verificando la Página, Instagram y los webhooks…');
+    setMessage(isMetaReviewer
+      ? 'Verifying the linked Page, Instagram account, and Webhooks…'
+      : 'Verificando la Página, Instagram y los webhooks…');
     void api.post<CompleteResult>('/api/admin/meta-onboarding/instagram/complete', { code })
       .then((value) => {
         setResult(value);
         setState('done');
         setMessage(value.subscribed
-          ? 'Instagram quedó conectado y preparado para recibir mensajes.'
-          : 'La credencial quedó guardada. Falta habilitar la recepción en Webhooks de Meta.');
+          ? (isMetaReviewer ? 'Instagram is connected and ready to receive messages.' : 'Instagram quedó conectado y preparado para recibir mensajes.')
+          : (isMetaReviewer ? 'The credential is stored. Meta Webhooks still needs message reception enabled.' : 'La credencial quedó guardada. Falta habilitar la recepción en Webhooks de Meta.'));
       })
       .catch((requestError) => {
         setState('error');
         setMessage(requestError instanceof Error ? requestError.message : 'No se pudo completar la conexión');
       });
-  }, [config]);
+  }, [config, isMetaReviewer]);
 
   const launch = () => {
     if (!config) return;
     setState('waiting');
-    setMessage('Abriendo Meta para elegir la Página IPHONE Culture Neuquén y @iphoneculture_…');
+    setMessage(isMetaReviewer
+      ? 'Opening Meta to select the linked Facebook Page and Instagram professional account…'
+      : 'Abriendo Meta para elegir la Página IPHONE Culture Neuquén y @iphoneculture_…');
     setResult(null);
     const stateValue = crypto.randomUUID();
     sessionStorage.setItem('instagram_oauth_state', stateValue);
@@ -109,14 +115,16 @@ export default function InstagramSetup() {
 
   const subscribe = () => {
     setState('subscribing');
-    setMessage('Activando la recepción de mensajes en Meta…');
+    setMessage(isMetaReviewer ? 'Enabling message reception in Meta…' : 'Activando la recepción de mensajes en Meta…');
     void api.post<{ ok: boolean; subscribed: boolean }>('/api/admin/meta-onboarding/instagram/subscribe', {})
       .then((value) => {
         if (!value.subscribed) throw new Error('Meta todavía no confirmó la suscripción');
         setConfig((current) => current ? { ...current, webhookSubscribed: true } : current);
         setResult((current) => current ? { ...current, subscribed: true, subscriptionWarning: null } : current);
         setState('done');
-        setMessage('Instagram está conectado y preparado para recibir mensajes.');
+        setMessage(isMetaReviewer
+          ? 'Instagram is connected and ready to receive messages.'
+          : 'Instagram está conectado y preparado para recibir mensajes.');
       })
       .catch((requestError) => {
         setState('error');
@@ -132,17 +140,65 @@ export default function InstagramSetup() {
 
   if (!config && state !== 'error') return <Spinner />;
 
+  const copy = isMetaReviewer ? {
+    title: 'Connect Instagram messages',
+    subtitle: 'Meta authorization through the linked Facebook Page',
+    safe: 'Automatic replies are OFF',
+    review: 'Meta App Review environment: this account is restricted to the Instagram connection flow.',
+    noLogin: 'Authorize the professional Instagram account',
+    auth: 'Use Facebook Login and select the Page linked to the Instagram professional account.',
+    secret: 'The access token is encrypted on the server and is never displayed in the browser.',
+    direct: 'Instagram Direct',
+    directHelp: 'Receives Instagram DMs and allows a team member to reply. Automatic replies remain disabled.',
+    missing: 'The secure Meta configuration is incomplete on the server.',
+    connect: state === 'saving' ? 'Verifying…' : state === 'done' ? 'Reconnect with Meta' : 'Continue with Facebook',
+    activating: state === 'subscribing' ? 'Enabling message reception…' : 'Enable message reception',
+    prepared: 'Connection status',
+    instagram: 'Instagram',
+    page: 'Linked Page',
+    professional: 'verified professional account',
+    verifiedPage: 'verified linked Page',
+    reception: 'Message reception',
+    subscribed: 'enabled',
+    pending: 'pending',
+    automation: 'Automatic replies',
+    disabled: 'disabled',
+  } : {
+    title: 'Conectar mensajes de Instagram',
+    subtitle: 'Autorización mediante Facebook y la Página vinculada',
+    safe: 'Sin respuestas automáticas',
+    review: 'Entorno de revisión de Meta: esta cuenta solo puede acceder a la conexión de Instagram.',
+    noLogin: 'No necesitás iniciar sesión directamente en Instagram',
+    auth: 'Meta autoriza la cuenta profesional a través de tu Facebook y de la Página IPHONE Culture Neuquén.',
+    secret: 'La credencial queda cifrada en el servidor y nunca se muestra en el navegador.',
+    direct: 'Instagram Direct',
+    directHelp: 'Conecta recepción y respuesta manual; la automatización permanece apagada.',
+    missing: 'Falta completar la configuración de Meta en el servidor.',
+    connect: state === 'saving' ? 'Verificando…' : state === 'done' ? 'Conectado' : 'Conectar con Facebook',
+    activating: state === 'subscribing' ? 'Activando recepción…' : 'Activar recepción de mensajes',
+    prepared: 'Conexión preparada',
+    instagram: 'Instagram',
+    page: 'Página',
+    professional: 'cuenta profesional verificada',
+    verifiedPage: 'Página vinculada verificada',
+    reception: 'Recepción de mensajes',
+    subscribed: 'suscrita',
+    pending: 'pendiente',
+    automation: 'Respuestas automáticas',
+    disabled: 'desactivadas',
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Conectar mensajes de Instagram"
-        subtitle="Autorización mediante Facebook y la Página vinculada"
-        actions={<Badge color="success">Sin respuestas automáticas</Badge>}
+        title={copy.title}
+        subtitle={copy.subtitle}
+        actions={<Badge color="success">{copy.safe}</Badge>}
       />
       {isMetaReviewer && (
         <Card>
           <p className="text-sm text-slate-300">
-            Entorno de revisión de Meta: esta cuenta solo puede acceder a la conexión de Instagram.
+            {copy.review}
           </p>
         </Card>
       )}
@@ -150,9 +206,9 @@ export default function InstagramSetup() {
         <div className="flex items-start gap-4">
           <ShieldCheck className="h-8 w-8 text-neon shrink-0" />
           <div className="space-y-2">
-            <h2 className="text-lg font-semibold text-white">No necesitás iniciar sesión directamente en Instagram</h2>
-            <p className="text-slate-300">Meta autoriza la cuenta profesional a través de tu Facebook y de la Página IPHONE Culture Neuquén.</p>
-            <p className="text-sm text-slate-400">La credencial queda cifrada en el servidor y nunca se muestra en el navegador.</p>
+            <h2 className="text-lg font-semibold text-white">{copy.noLogin}</h2>
+            <p className="text-slate-300">{copy.auth}</p>
+            <p className="text-sm text-slate-400">{copy.secret}</p>
           </div>
         </div>
       </Card>
@@ -161,17 +217,13 @@ export default function InstagramSetup() {
           <div className="flex items-center gap-3">
             <Instagram className="h-6 w-6 text-fuchsia-400" />
             <div>
-              <div className="font-semibold text-white">Instagram Direct</div>
-              <div className="text-sm text-slate-400">Conecta recepción y respuesta manual; la automatización permanece apagada.</div>
+              <div className="font-semibold text-white">{copy.direct}</div>
+              <div className="text-sm text-slate-400">{copy.directHelp}</div>
             </div>
           </div>
-          {!config?.ready && <p className="text-amber-300">Falta completar la configuración de Meta en el servidor.</p>}
+          {!config?.ready && <p className="text-amber-300">{copy.missing}</p>}
           <Button onClick={launch} disabled={!config?.ready || state === 'waiting' || state === 'saving' || (state === 'done' && !isMetaReviewer)}>
-            {state === 'saving'
-              ? 'Verificando…'
-              : state === 'done'
-                ? isMetaReviewer ? 'Volver a conectar con Meta' : 'Conectado'
-                : 'Conectar con Facebook'}
+            {isMetaReviewer && state === 'done' ? 'Reconnect with Meta' : copy.connect}
           </Button>
           {config?.connected && !config.webhookSubscribed && !isMetaReviewer && (
             <Button
@@ -179,7 +231,7 @@ export default function InstagramSetup() {
               onClick={subscribe}
               disabled={state === 'subscribing'}
             >
-              {state === 'subscribing' ? 'Activando recepción…' : 'Activar recepción de mensajes'}
+              {copy.activating}
             </Button>
           )}
           {message && <p className={state === 'error' ? 'text-red-300' : 'text-slate-300'}>{message}</p>}
@@ -190,11 +242,11 @@ export default function InstagramSetup() {
           <div className="flex items-start gap-3">
             <CheckCircle2 className="h-7 w-7 text-emerald-400 shrink-0" />
             <div className="space-y-1 text-slate-300">
-              <div className="font-semibold text-white">Conexión preparada</div>
-              <div>Instagram: {connection.username ? `@${connection.username}` : 'cuenta profesional verificada'}</div>
-              <div>Página: {connection.pageName || 'Página vinculada verificada'}</div>
-              <div>Recepción de mensajes: {connection.subscribed ? 'suscrita' : 'pendiente'}</div>
-              <div>Respuestas automáticas: desactivadas</div>
+              <div className="font-semibold text-white">{copy.prepared}</div>
+              <div>{copy.instagram}: {connection.username ? `@${connection.username}` : copy.professional}</div>
+              <div>{copy.page}: {connection.pageName || copy.verifiedPage}</div>
+              <div>{copy.reception}: {connection.subscribed ? copy.subscribed : copy.pending}</div>
+              <div>{copy.automation}: {copy.disabled}</div>
             </div>
           </div>
         </Card>
