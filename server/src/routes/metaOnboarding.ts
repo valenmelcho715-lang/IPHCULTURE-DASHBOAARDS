@@ -218,7 +218,12 @@ router.post('/instagram/subscribe', async (_req: AuthRequest, res: Response) => 
       });
     }
   }
-  res.status(502).json({ error: warning, stage: 'asset_subscription', attempts });
+  const instagramAttempt = attempts.find((attempt) => attempt.asset === 'instagram');
+  res.status(502).json({
+    error: instagramAttempt?.error || warning,
+    stage: 'asset_subscription',
+    attempts,
+  });
 });
 
 router.post('/instagram/complete', async (req: AuthRequest, res: Response) => {
